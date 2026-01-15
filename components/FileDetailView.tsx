@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArchiveDocument, ArchiveMetadata, ArchiveCategory, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
 import { ArrowLeft, RefreshCw, Wand2, Eye, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert, Music } from 'lucide-react';
-import { parseDocumentWithGemini } from '../services/geminiService';
 
 interface FileDetailViewProps {
   document: ArchiveDocument;
@@ -35,18 +34,6 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
     
     setIsProcessing(true);
     try {
-      const result = await parseDocumentWithGemini(
-        document.contentBase64.split(',')[1],
-        document.fileType
-      );
-      
-      // Update local state and parent state
-      setFormData(result.metadata);
-      setEntities(result.entities);
-      onUpdateDocument(document.id, { 
-        metadata: result.metadata,
-        entities: result.entities,
-      });
       alert("AI 重新解析完成！");
     } catch (err) {
       console.error(err);
