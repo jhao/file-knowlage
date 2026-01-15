@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, ArchiveCategory, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
 import { Check, X, RefreshCw, Wand2, AlertTriangle, Eye, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert } from 'lucide-react';
-import { parseDocumentWithGemini } from '../services/geminiService';
 
 interface VerificationViewProps {
   documents: ArchiveDocument[];
@@ -47,18 +46,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     
     setIsProcessing(true);
     try {
-      const result = await parseDocumentWithGemini(
-        activeDoc.contentBase64.split(',')[1],
-        activeDoc.fileType
-      );
-      
-      onUpdateDocument(activeDoc.id, { 
-        metadata: result.metadata,
-        entities: result.entities,
-        status: ArchiveStatus.REVIEW_NEEDED 
-      });
-      setFormData(result.metadata);
-      setEntities(result.entities);
+
     } catch (err) {
       console.error(err);
       alert("AI Processing Failed. Check API Key.");
