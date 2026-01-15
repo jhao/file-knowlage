@@ -10,7 +10,6 @@ import SystemSettings from './components/SystemSettings';
 import FileDetailView from './components/FileDetailView';
 import MyUploadsView from './components/MyUploadsView'; // Imported new component
 import { ArchiveDocument, ArchiveStatus, ArchiveCategory, SecurityLevel, UserRole } from './types';
-import { parseDocumentWithGemini } from './services/geminiService';
 
 // Mock current user ID
 const CURRENT_USER_ID = 'u1';
@@ -333,16 +332,7 @@ const App: React.FC = () => {
     newDocs.forEach(async (doc) => {
         try {
             if (doc.contentBase64) {
-                 const result = await parseDocumentWithGemini(
-                     doc.contentBase64.split(',')[1], 
-                     doc.fileType
-                 );
                  
-                 setDocuments(prev => prev.map(d => 
-                    d.id === doc.id 
-                    ? { ...d, status: ArchiveStatus.REVIEW_NEEDED, metadata: result.metadata, entities: result.entities } 
-                    : d
-                 ));
             }
         } catch (e) {
             console.error("Auto-process failed", e);
