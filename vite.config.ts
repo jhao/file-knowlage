@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       base: "/file-knowlage/",
       define: {
-        'process.env.API_KEY': ‘abcdefg’, 
-        'process.env.GEMINI_API_KEY': ‘abcdefg’
+        'process.env.API_KEY': 'abcdefg', 
+        'process.env.GEMINI_API_KEY': 'abcdefg'
       },
       resolve: {
         alias: {
