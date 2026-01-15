@@ -1,0 +1,5 @@
+{
+  "name": "UniArchive AI",
+  "description": "一个利用 Gemini AI 的智能高校档案管理系统，用于学术文档、人事档案和科研材料的自动解析、分类和人机协同校验。",
+  "requestFramePermissions": []
+}
