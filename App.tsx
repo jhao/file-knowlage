@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -9,6 +9,8 @@ import UserManagement from './components/UserManagement';
 import SystemSettings from './components/SystemSettings';
 import FileDetailView from './components/FileDetailView';
 import MyUploadsView from './components/MyUploadsView'; // Imported new component
+import LoginView from './components/LoginView';
+import { login as loginApi, getCurrentUser, type AuthUser } from './services/authApi';
 import { ArchiveDocument, ArchiveStatus, ArchiveCategory, SecurityLevel, UserRole } from './types';
 
 // Mock current user ID
@@ -299,6 +301,44 @@ const App: React.FC = () => {
   // Simple Mock Auth State
   const [userRole, setUserRole] = useState<UserRole>(UserRole.ADMIN);
 
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    getCurrentUser(token)
+      .then((user) => {
+        setAuthUser(user);
+        setUserRole(user.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.USER);
+      })
+      .catch(() => {
+        localStorage.removeItem('auth_token');
+      });
+  }, []);
+
+  const handleLogin = async (username: string, password: string) => {
+    setIsLoginSubmitting(true);
+    setLoginError('');
+    try {
+      const result = await loginApi(username, password);
+      localStorage.setItem('auth_token', result.accessToken);
+      setAuthUser(result.user);
+      setUserRole(result.user.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.USER);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : '登录失败');
+    } finally {
+      setIsLoginSubmitting(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    setAuthUser(null);
+  };
+
   // Helper to read file as base64
   const readFileAsBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -383,22 +423,13 @@ const App: React.FC = () => {
 
   const reviewCount = documents.filter(d => d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.PROCESSING).length;
 
+  if (!authUser) {
+    return <LoginView onSubmit={handleLogin} isSubmitting={isLoginSubmitting} errorMessage={loginError} />;
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-50">
-      <Header />
-      {/* Role Switcher Demo Control (Floating) */}
-      <div className="fixed bottom-4 right-4 z-50 bg-white shadow-lg border border-slate-200 p-2 rounded-lg text-xs opacity-75 hover:opacity-100 transition-opacity">
-          <p className="mb-1 font-bold text-slate-500">演示模式: 当前角色</p>
-          <select 
-              value={userRole} 
-              onChange={e => setUserRole(e.target.value as UserRole)}
-              className="bg-slate-100 rounded px-2 py-1 outline-none"
-          >
-              <option value={UserRole.ADMIN}>系统管理员</option>
-              <option value={UserRole.USER}>普通用户</option>
-          </select>
-      </div>
-
+      <Header userName={authUser.displayName} userDepartment={authUser.department} onLogout={handleLogout} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar 
           currentView={currentView} 
