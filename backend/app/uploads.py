@@ -2,7 +2,7 @@ import uuid
 
 from flask import Blueprint, g, jsonify, request
 
-from .auth import log_action, login_required, require_permission
+from .auth import log_action, log_ai_api_call, login_required, require_permission
 from .extensions import db
 from .models import AITask, Archive
 
@@ -41,5 +41,6 @@ def create_upload():
     )
     db.session.add(task)
     db.session.commit()
+    log_ai_api_call("AI_PARSE_ENQUEUE", f"档案 {archive.file_name} 已提交 AI 解析任务 {task.task_id}", task.task_id)
     log_action("UPLOAD_CREATE", "archive", archive.document_id, f"上传文件 {archive.file_name}")
     return jsonify({"archive": archive.to_dict(), "taskId": task.task_id}), 201

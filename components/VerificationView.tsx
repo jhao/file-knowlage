@@ -120,8 +120,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
               </div>
 
               <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-                <button onClick={handleReject} className="flex-1 btn-secondary text-red-600 border-red-200 hover:bg-red-50">驳回</button>
-                <button onClick={handleConfirm} className="flex-[2] btn-primary bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl shadow-md" disabled={activeDoc.status === ArchiveStatus.PROCESSING}><Save size={16} /> 确认入库</button>
+                <button onClick={handleReject} className="flex-1 btn-secondary text-red-600 border-red-200 hover:bg-red-50 inline-flex items-center justify-center gap-1.5 leading-none"><X size={14} /> 驳回</button>
+                <button onClick={handleConfirm} className="flex-[2] btn-primary bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl shadow-md inline-flex items-center justify-center gap-1.5 leading-none" disabled={activeDoc.status === ArchiveStatus.PROCESSING}><Save size={16} /> 确认入库</button>
               </div>
             </div>
           </>

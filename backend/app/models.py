@@ -193,10 +193,15 @@ class OperationLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=True)
+    log_type = db.Column(db.String(32), nullable=False, default="ACTION")
     action = db.Column(db.String(128), nullable=False)
     target_type = db.Column(db.String(64), nullable=True)
     target_id = db.Column(db.String(128), nullable=True)
     detail = db.Column(db.Text, nullable=True)
+    method = db.Column(db.String(16), nullable=True)
+    path = db.Column(db.String(255), nullable=True)
+    status_code = db.Column(db.Integer, nullable=True)
+    duration_ms = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 

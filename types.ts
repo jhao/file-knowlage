@@ -84,6 +84,31 @@ export interface AITaskLog {
   updatedAt: string;
 }
 
+export type SystemLogType = 'ALL' | 'BACKEND_API' | 'AI_API' | 'ACTION';
+
+export interface SystemLogEntry {
+  id: number;
+  userId?: number;
+  type: Exclude<SystemLogType, 'ALL'>;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  detail?: string;
+  method?: string;
+  path?: string;
+  statusCode?: number;
+  durationMs?: number;
+  createdAt: string;
+}
+
+export interface SystemLogQuery {
+  type?: SystemLogType;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  page?: number;
+}
+
 export enum UserRole {
   ADMIN = '管理员',
   USER = '普通用户'

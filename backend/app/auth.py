@@ -51,8 +51,24 @@ def log_action(action: str, target_type: str = "", target_id: str = "", detail: 
     db.session.add(
         OperationLog(
             user_id=current_user.id if current_user else None,
+            log_type="ACTION",
             action=action,
             target_type=target_type,
+            target_id=str(target_id) if target_id else None,
+            detail=detail,
+        )
+    )
+    db.session.commit()
+
+
+def log_ai_api_call(action: str, detail: str = "", target_id: str = "") -> None:
+    current_user = getattr(g, "current_user", None)
+    db.session.add(
+        OperationLog(
+            user_id=current_user.id if current_user else None,
+            log_type="AI_API",
+            action=action,
+            target_type="ai",
             target_id=str(target_id) if target_id else None,
             detail=detail,
         )
