@@ -65,10 +65,18 @@ flask --app wsgi run --debug --host 0.0.0.0 --port 5009
 - 管理员：`admin/admin123`
 - 普通用户：`user/user123`
 
-### 登录相关接口
+### 后端核心接口（新增）
 
 - `POST /api/auth/login`：登录获取 token
-- `GET /api/auth/me`：校验 token 并返回当前用户信息
+- `GET /api/auth/me`：校验 token 并返回当前用户信息及权限
+- `GET/POST/PUT/DELETE /api/archives`：档案主数据、元数据、实体与版本管理
+- `POST /api/uploads`：创建上传记录并生成 AI 任务
+- `GET /api/tasks`：查询 AI 任务状态
+- `GET /api/reviews/queue`、`POST /api/reviews/<id>/approve|reject`：审核工作台
+- `GET/POST/PUT /api/users`：用户管理
+- `GET /api/search`：关键词+实体检索
+- `GET /api/stats/dashboard`：仪表盘统计
+- `GET/PUT /api/settings`：系统配置
 - `GET /api/health`：健康检查
 
 ## 4. Docker 部署
