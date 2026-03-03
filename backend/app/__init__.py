@@ -1,11 +1,14 @@
 import os
+from time import perf_counter
 
-from flask import Flask, jsonify
+from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 
 from .archives import bp as archives_bp
 from .auth import bp as auth_bp
 from .extensions import db
+from .logs import bp as logs_bp
+from .models import OperationLog
 from .reviews import bp as reviews_bp
 from .search import bp as search_bp
 from .settings import bp as settings_bp
@@ -42,6 +45,35 @@ def create_app() -> Flask:
     app.register_blueprint(search_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(logs_bp)
+
+    @app.before_request
+    def _start_timer():
+        g.request_started_at = perf_counter()
+
+    @app.after_request
+    def _record_api_log(response):
+        if not request.path.startswith("/api"):
+            return response
+        try:
+            elapsed_ms = int((perf_counter() - getattr(g, "request_started_at", perf_counter())) * 1000)
+            current_user = getattr(g, "current_user", None)
+            db.session.add(
+                OperationLog(
+                    user_id=current_user.id if current_user else None,
+                    log_type="BACKEND_API",
+                    action="API_REQUEST",
+                    detail=f"{request.method} {request.path}",
+                    method=request.method,
+                    path=request.path,
+                    status_code=response.status_code,
+                    duration_ms=elapsed_ms,
+                )
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return response
 
     @app.get("/api/health")
     def health_check():

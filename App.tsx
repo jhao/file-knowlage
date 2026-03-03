@@ -10,6 +10,7 @@ import SystemSettings from './components/SystemSettings';
 import FileDetailView from './components/FileDetailView';
 import MyUploadsView from './components/MyUploadsView';
 import LoginView from './components/LoginView';
+import SystemLogsView from './components/SystemLogsView';
 import { login as loginApi, getCurrentUser, type AuthUser } from './services/authApi';
 import { approveArchive, createUpload, listArchives, rejectArchive, updateArchive } from './services/archiveApi';
 import { ArchiveDocument, ArchiveStatus, UserRole } from './types';
@@ -128,6 +129,8 @@ const App: React.FC = () => {
         return <UserManagement />;
       case 'settings':
         return <SystemSettings />;
+      case 'logs':
+        return <SystemLogsView />;
       case 'file-detail': {
         const selectedDoc = documents.find((d) => d.id === selectedDocumentId);
         if (!selectedDoc) return <ArchiveList documents={documents} onViewDocument={handleViewDocument} />;

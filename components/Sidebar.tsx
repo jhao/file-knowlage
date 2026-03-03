@@ -10,6 +10,10 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, reviewCount, currentUserRole }) => {
+  const usedStorageTb = 1.2;
+  const totalStorageTb = 1.5;
+  const usedPercent = Math.min(100, Math.round((usedStorageTb / totalStorageTb) * 100));
+
   const menuItems = [
     { id: 'dashboard', label: '概览', icon: LayoutDashboard },
     { id: 'my-uploads', label: '我上传的文件', icon: FileStack },
@@ -58,9 +62,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, reviewCount,
         <div className="bg-slate-800 rounded-xl p-4">
           <p className="text-xs text-slate-400 mb-2">加密存储空间</p>
           <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden mb-2">
-            <div className="bg-emerald-500 h-full w-[75%] rounded-full"></div>
+            <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${usedPercent}%` }}></div>
           </div>
-          <p className="text-xs font-mono text-white">1.2TB / 1.5TB</p>
+          <p className="text-xs font-mono text-white">{usedStorageTb}TB / {totalStorageTb}TB ({usedPercent}%)</p>
         </div>
       </div>
     </aside>
