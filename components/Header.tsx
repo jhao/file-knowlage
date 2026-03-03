@@ -15,7 +15,7 @@ const Header: React.FC<HeaderProps> = ({ userName, userDepartment, onLogout }) =
           <School size={24} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-800 tracking-tight">UniArchive AI 高校智能档案系统</h1>
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">高校智能档案系统</h1>
           <p className="text-xs text-slate-500 font-medium">智能档案管理平台</p>
         </div>
       </div>

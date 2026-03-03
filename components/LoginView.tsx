@@ -24,7 +24,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onSubmit, isSubmitting, errorMess
             <School size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">UniArchive AI 登录</h2>
+            <h2 className="text-xl font-bold text-slate-800">系统登录</h2>
             <p className="text-xs text-slate-500">默认管理员：admin / admin123</p>
           </div>
         </div>

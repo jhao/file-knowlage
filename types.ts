@@ -68,6 +68,20 @@ export interface ArchiveDocument {
   contentBase64?: string;
   uploadedBy?: string; // User ID
   path?: string; // Relative path/folder structure e.g. "2023_Scans/"
+  aiTaskId?: string;
+  aiStatus?: string;
+  aiMessage?: string;
+  aiUpdatedAt?: string;
+}
+
+export interface AITaskLog {
+  taskId: string;
+  archiveId: string;
+  taskType: string;
+  status: string;
+  message?: string;
+  retryCount: number;
+  updatedAt: string;
 }
 
 export enum UserRole {
