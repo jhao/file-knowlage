@@ -37,15 +37,30 @@ def seed_command() -> None:
 
     db.session.flush()
 
-    if SystemConfig.query.filter_by(config_key="entity_types").first() is None:
-        db.session.add(
-            SystemConfig(
-                config_key="entity_types",
-                config_value="Person,Location,Organization,Event,Concept",
-                description="知识实体分类",
-                updated_by=admin.id,
+
+    default_configs = [
+        ("entity_types", "Person,Location,Organization,Event,Concept", "知识实体分类"),
+        ("llm.provider", "kimi", "文档处理大模型提供商"),
+        ("llm.kimi_url", "https://api.moonshot.cn/v1", "Kimi API 基础地址"),
+        ("llm.kimi_api_key", "", "Kimi API Key"),
+        ("llm.qwen_url", "https://dashscope.aliyuncs.com/compatible-mode/v1", "千问 API 基础地址"),
+        ("llm.qwen_api_key", "", "千问 API Key"),
+        ("llm.openai_url", "https://api.openai.com/v1", "OpenAI API 基础地址"),
+        ("llm.openai_api_key", "", "OpenAI API Key"),
+        ("llm.local_url", "http://127.0.0.1:11434/v1", "本地大模型 API 基础地址"),
+        ("llm.local_api_key", "", "本地大模型 API Key"),
+    ]
+
+    for key, value, desc in default_configs:
+        if SystemConfig.query.filter_by(config_key=key).first() is None:
+            db.session.add(
+                SystemConfig(
+                    config_key=key,
+                    config_value=value,
+                    description=desc,
+                    updated_by=admin.id,
+                )
             )
-        )
 
     if Archive.query.filter_by(document_id="seed-doc-001").first() is None:
         archive = Archive(
