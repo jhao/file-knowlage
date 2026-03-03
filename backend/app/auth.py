@@ -4,9 +4,29 @@ from functools import wraps
 import jwt
 from flask import Blueprint, current_app, g, jsonify, request
 
-from .models import User
+from .extensions import db
+from .models import OperationLog, User
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+ROLE_PERMISSIONS = {
+    "管理员": {
+        "canView": True,
+        "canImport": True,
+        "canExport": True,
+        "canModify": True,
+        "canDelete": True,
+        "canApprove": True,
+    },
+    "普通用户": {
+        "canView": True,
+        "canImport": True,
+        "canExport": False,
+        "canModify": False,
+        "canDelete": False,
+        "canApprove": False,
+    },
+}
 
 
 def _generate_token(user: User) -> str:
@@ -26,6 +46,20 @@ def _decode_token(raw_token: str) -> dict:
     return jwt.decode(raw_token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
 
 
+def log_action(action: str, target_type: str = "", target_id: str = "", detail: str = "") -> None:
+    current_user = getattr(g, "current_user", None)
+    db.session.add(
+        OperationLog(
+            user_id=current_user.id if current_user else None,
+            action=action,
+            target_type=target_type,
+            target_id=str(target_id) if target_id else None,
+            detail=detail,
+        )
+    )
+    db.session.commit()
+
+
 def login_required(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
@@ -39,10 +73,11 @@ def login_required(view_func):
 
         try:
             payload = _decode_token(token)
-            user = User.query.get(int(payload["sub"]))
-            if user is None:
-                return jsonify({"message": "用户不存在"}), 401
+            user = db.session.get(User, int(payload["sub"]))
+            if user is None or not user.is_active:
+                return jsonify({"message": "用户不存在或已禁用"}), 401
             g.current_user = user
+            g.permissions = ROLE_PERMISSIONS.get(user.role, {})
         except jwt.ExpiredSignatureError:
             return jsonify({"message": "登录已过期，请重新登录"}), 401
         except (jwt.InvalidTokenError, ValueError):
@@ -51,6 +86,19 @@ def login_required(view_func):
         return view_func(*args, **kwargs)
 
     return wrapper
+
+
+def require_permission(permission_key: str):
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            if not getattr(g, "permissions", {}).get(permission_key, False):
+                return jsonify({"message": "权限不足"}), 403
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 @bp.post("/login")
@@ -67,6 +115,8 @@ def login():
         return jsonify({"message": "用户名或密码错误"}), 401
 
     token = _generate_token(user)
+    g.current_user = user
+    log_action("LOGIN", "user", str(user.id), "用户登录")
     return jsonify({"accessToken": token, "user": user.to_dict()})
 
 
@@ -74,4 +124,4 @@ def login():
 @login_required
 def me():
     user = g.current_user
-    return jsonify({"user": user.to_dict()})
+    return jsonify({"user": user.to_dict(), "permissions": g.permissions})
