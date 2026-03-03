@@ -40,6 +40,19 @@ source .venv/bin/activate  # Windows 使用 .venv\\Scripts\\activate
 pip install -r requirements.txt
 ```
 
+建议统一使用 `python -m flask` 执行 Flask CLI，避免误用系统全局的 `flask` 可执行文件（常见现象是报错路径指向 `/opt/homebrew/.../site-packages/flask`）。
+
+```bash
+python -m flask --app wsgi init-db
+python -m flask --app wsgi seed
+```
+
+若提示 `ModuleNotFoundError: No module named 'jwt'`，通常表示当前 Python 环境未安装后端依赖。请确认已激活 `backend/.venv` 后重新安装：
+
+```bash
+pip install -r requirements.txt
+```
+
 提示：若仅需运行数据库初始化等命令而暂不使用 Excel 导入/导出功能，可先跳过安装 `openpyxl`。当系统检测到缺少该依赖时，会在页面上给予提示并引导执行 `pip install openpyxl`。
 
 ### （可选）使用 MySQL
@@ -47,8 +60,8 @@ pip install -r requirements.txt
 ```bash
 export DATABASE_URI="mysql+pymysql://ailibrary:ailibrary@localhost/ailibrary"
 export SECRET_KEY="change-me"
-flask --app wsgi init-db
-flask --app wsgi seed
+python -m flask --app wsgi init-db
+python -m flask --app wsgi seed
 ```
 
 如果不设置 `DATABASE_URI`，默认使用 `instance/ailibrary.sqlite`。
@@ -56,9 +69,9 @@ flask --app wsgi seed
 ### 初始化并启动
 
 ```bash
-flask --app wsgi init-db
-flask --app wsgi seed
-flask --app wsgi run --debug --host 0.0.0.0 --port 5009
+python -m flask --app wsgi init-db
+python -m flask --app wsgi seed
+python -m flask --app wsgi run --debug --host 0.0.0.0 --port 5009
 ```
 
 默认账号：
