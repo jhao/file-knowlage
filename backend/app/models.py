@@ -86,6 +86,18 @@ class Archive(db.Model, TimestampMixin):
             data["metadata"] = self.metadata_record.to_dict()
         if self.entities:
             data["entities"] = [item.to_dict() for item in self.entities]
+
+        latest_task = (
+            AITask.query.filter_by(archive_id=self.id)
+            .order_by(AITask.updated_at.desc())
+            .first()
+        )
+        if latest_task is not None:
+            data["aiTaskId"] = latest_task.task_id
+            data["aiStatus"] = latest_task.status
+            data["aiMessage"] = latest_task.result_message
+            data["aiUpdatedAt"] = latest_task.updated_at.isoformat()
+
         return data
 
 

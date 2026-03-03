@@ -64,7 +64,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUpload }) => {
               ref={fileInputRef} 
               className="hidden" 
               onChange={handleFileSelect}
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.mp4,.mp3,.wav"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.log,.json,.xml,.jpg,.jpeg,.png,.gif,.webp,.mp4,.avi,.mov,.mkv,.mp3,.wav,.m4a,.aac"
             />
             <div className="bg-indigo-100 p-4 rounded-full text-indigo-600 mb-4">
               <UploadCloud size={48} />
@@ -97,7 +97,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUpload }) => {
           </div>
       </div>
       
-      <p className="text-xs text-slate-400 text-center">支持格式: PDF, Word, Excel, JPG, MP4, MP3 (最大 200MB)</p>
+      <p className="text-xs text-slate-400 text-center">支持格式: PDF、Office（Word/Excel/PPT）、音频、视频、TXT/Markdown/CSV/JSON/XML、图片等 (最大 200MB)</p>
 
       {selectedFiles.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

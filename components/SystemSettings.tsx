@@ -5,11 +5,13 @@ import { listSettings, updateSetting } from '../services/settingsApi';
 const DEFAULT_LLM_ENDPOINTS = {
   kimi: 'https://api.moonshot.cn/v1',
   qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  glm: 'https://open.bigmodel.cn/api/paas/v4',
+  deepseek: 'https://api.deepseek.com/v1',
   openai: 'https://api.openai.com/v1',
   local: 'http://127.0.0.1:11434/v1',
 };
 
-type LlmProvider = 'kimi' | 'qwen' | 'openai' | 'local';
+type LlmProvider = 'kimi' | 'qwen' | 'glm' | 'deepseek' | 'openai' | 'local';
 
 const SystemSettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -21,10 +23,14 @@ const SystemSettings: React.FC = () => {
   const [llmProvider, setLlmProvider] = useState<LlmProvider>('kimi');
   const [kimiUrl, setKimiUrl] = useState(DEFAULT_LLM_ENDPOINTS.kimi);
   const [qwenUrl, setQwenUrl] = useState(DEFAULT_LLM_ENDPOINTS.qwen);
+  const [glmUrl, setGlmUrl] = useState(DEFAULT_LLM_ENDPOINTS.glm);
+  const [deepseekUrl, setDeepseekUrl] = useState(DEFAULT_LLM_ENDPOINTS.deepseek);
   const [openaiUrl, setOpenaiUrl] = useState(DEFAULT_LLM_ENDPOINTS.openai);
   const [localUrl, setLocalUrl] = useState(DEFAULT_LLM_ENDPOINTS.local);
   const [kimiApiKey, setKimiApiKey] = useState('');
   const [qwenApiKey, setQwenApiKey] = useState('');
+  const [glmApiKey, setGlmApiKey] = useState('');
+  const [deepseekApiKey, setDeepseekApiKey] = useState('');
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [localApiKey, setLocalApiKey] = useState('');
 
@@ -36,10 +42,14 @@ const SystemSettings: React.FC = () => {
         setLlmProvider((map.get('llm.provider') as LlmProvider) || 'kimi');
         setKimiUrl(map.get('llm.kimi_url') || DEFAULT_LLM_ENDPOINTS.kimi);
         setQwenUrl(map.get('llm.qwen_url') || DEFAULT_LLM_ENDPOINTS.qwen);
+        setGlmUrl(map.get('llm.glm_url') || DEFAULT_LLM_ENDPOINTS.glm);
+        setDeepseekUrl(map.get('llm.deepseek_url') || DEFAULT_LLM_ENDPOINTS.deepseek);
         setOpenaiUrl(map.get('llm.openai_url') || DEFAULT_LLM_ENDPOINTS.openai);
         setLocalUrl(map.get('llm.local_url') || DEFAULT_LLM_ENDPOINTS.local);
         setKimiApiKey(map.get('llm.kimi_api_key') || '');
         setQwenApiKey(map.get('llm.qwen_api_key') || '');
+        setGlmApiKey(map.get('llm.glm_api_key') || '');
+        setDeepseekApiKey(map.get('llm.deepseek_api_key') || '');
         setOpenaiApiKey(map.get('llm.openai_api_key') || '');
         setLocalApiKey(map.get('llm.local_api_key') || '');
       })
@@ -50,17 +60,21 @@ const SystemSettings: React.FC = () => {
 
   const activeProviderUrl = useMemo(() => {
     if (llmProvider === 'qwen') return qwenUrl;
+    if (llmProvider === 'glm') return glmUrl;
+    if (llmProvider === 'deepseek') return deepseekUrl;
     if (llmProvider === 'openai') return openaiUrl;
     if (llmProvider === 'local') return localUrl;
     return kimiUrl;
-  }, [llmProvider, kimiUrl, qwenUrl, openaiUrl, localUrl]);
+  }, [llmProvider, kimiUrl, qwenUrl, glmUrl, deepseekUrl, openaiUrl, localUrl]);
 
   const activeProviderToken = useMemo(() => {
     if (llmProvider === 'qwen') return qwenApiKey;
+    if (llmProvider === 'glm') return glmApiKey;
+    if (llmProvider === 'deepseek') return deepseekApiKey;
     if (llmProvider === 'openai') return openaiApiKey;
     if (llmProvider === 'local') return localApiKey;
     return kimiApiKey;
-  }, [llmProvider, kimiApiKey, qwenApiKey, openaiApiKey, localApiKey]);
+  }, [llmProvider, kimiApiKey, qwenApiKey, glmApiKey, deepseekApiKey, openaiApiKey, localApiKey]);
 
   const saveGeneral = async () => {
     setSaving(true);
@@ -93,6 +107,20 @@ const SystemSettings: React.FC = () => {
           tokenKey: 'llm.qwen_api_key',
           tokenValue: qwenApiKey,
           providerName: '千问',
+        },
+        glm: {
+          urlKey: 'llm.glm_url',
+          urlValue: glmUrl,
+          tokenKey: 'llm.glm_api_key',
+          tokenValue: glmApiKey,
+          providerName: 'GLM-4.6V',
+        },
+        deepseek: {
+          urlKey: 'llm.deepseek_url',
+          urlValue: deepseekUrl,
+          tokenKey: 'llm.deepseek_api_key',
+          tokenValue: deepseekApiKey,
+          providerName: 'DeepSeek',
         },
         openai: {
           urlKey: 'llm.openai_url',
@@ -169,12 +197,14 @@ const SystemSettings: React.FC = () => {
           {!loading && activeTab === 'ai' && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
               <h3 className="text-lg font-bold text-slate-800">文档处理大模型配置</h3>
-              <p className="text-sm text-slate-500">用于文档内容提取/处理。默认支持 Kimi、千问、OpenAI、本地大模型（可覆盖默认 URL）。</p>
+              <p className="text-sm text-slate-500">用于文档内容提取/处理。默认支持 Kimi、千问、GLM-4.6V、DeepSeek、OpenAI、本地大模型（可覆盖默认 URL）。</p>
 
               <label className="text-sm font-medium text-slate-700">服务商</label>
               <select className="w-full border border-slate-300 rounded-lg p-2" value={llmProvider} onChange={(e) => setLlmProvider(e.target.value as LlmProvider)}>
                 <option value="kimi">Kimi</option>
                 <option value="qwen">千问</option>
+                <option value="glm">GLM-4.6V</option>
+                <option value="deepseek">DeepSeek</option>
                 <option value="openai">OpenAI</option>
                 <option value="local">本地大模型</option>
               </select>
@@ -190,6 +220,20 @@ const SystemSettings: React.FC = () => {
                 <div>
                   <label className="text-xs text-slate-600">千问 URL</label>
                   <input className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={qwenUrl} onChange={(e) => setQwenUrl(e.target.value)} />
+                </div>
+              )}
+
+              {llmProvider === 'glm' && (
+                <div>
+                  <label className="text-xs text-slate-600">GLM URL</label>
+                  <input className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={glmUrl} onChange={(e) => setGlmUrl(e.target.value)} />
+                </div>
+              )}
+
+              {llmProvider === 'deepseek' && (
+                <div>
+                  <label className="text-xs text-slate-600">DeepSeek URL</label>
+                  <input className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={deepseekUrl} onChange={(e) => setDeepseekUrl(e.target.value)} />
                 </div>
               )}
 
@@ -215,6 +259,8 @@ const SystemSettings: React.FC = () => {
                   value={activeProviderToken}
                   onChange={(e) => {
                     if (llmProvider === 'qwen') setQwenApiKey(e.target.value);
+                    else if (llmProvider === 'glm') setGlmApiKey(e.target.value);
+                    else if (llmProvider === 'deepseek') setDeepseekApiKey(e.target.value);
                     else if (llmProvider === 'openai') setOpenaiApiKey(e.target.value);
                     else if (llmProvider === 'local') setLocalApiKey(e.target.value);
                     else setKimiApiKey(e.target.value);
