@@ -63,10 +63,10 @@ def delete_task(task_id: str):
     archive = db.session.get(Archive, task.archive_id)
 
     task.status = "DELETED"
-    task.result_message = "任务已删除，不再执行 AI 调用"
+    task.result_message = "任务已删除，状态转为等待人工校验"
     if archive is not None:
-        archive.status = "删除"
+        archive.status = "等待人工校验"
 
     db.session.commit()
-    log_action("TASK_DELETE", "ai_task", task_id, f"删除后台任务 {task_id}，停止 AI 调用")
+    log_action("TASK_DELETE", "ai_task", task_id, f"删除后台任务 {task_id}，档案转为等待人工校验")
     return jsonify({"message": "任务已删除"})
