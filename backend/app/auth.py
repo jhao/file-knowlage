@@ -58,7 +58,10 @@ def log_action(action: str, target_type: str = "", target_id: str = "", detail: 
             detail=detail,
         )
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def log_ai_api_call(action: str, detail: str = "", target_id: str = "") -> None:
@@ -73,7 +76,10 @@ def log_ai_api_call(action: str, detail: str = "", target_id: str = "") -> None:
             detail=detail,
         )
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def login_required(view_func):
