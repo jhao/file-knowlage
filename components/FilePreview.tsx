@@ -133,7 +133,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
   const isText = fileType.startsWith('text/') || ['txt', 'md', 'csv', 'log', 'json', 'xml'].includes(ext);
   const isExcel = ['xls', 'xlsx'].includes(ext) || ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(fileType);
   const isDocx = ['docx'].includes(ext) || ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(fileType);
-  const isOffice = isExcel || isDocx || isPdf || ['doc', 'ppt', 'pptx'].includes(ext);
+  const isPpt = ['ppt', 'pptx'].includes(ext) || ['application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(fileType);
+  const isOffice = isExcel || isDocx || isPdf || isPpt || ['doc'].includes(ext);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -142,6 +143,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
   const [isFetchingSource, setIsFetchingSource] = useState(false);
 
   const [docxHtml, setDocxHtml] = useState('');
+  const [pptHtml, setPptHtml] = useState('');
   const [excelSheets, setExcelSheets] = useState<ExcelSheetData[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
@@ -193,6 +195,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
   const resetPreviewState = () => {
     setError('');
     setDocxHtml('');
+    setPptHtml('');
     setExcelSheets([]);
     setActiveSheetIndex(0);
     setSelectedCell(null);
@@ -257,6 +260,21 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
           if (!cancelled) {
             setDocxHtml(container.innerHTML || '<div class="p-4">文档内容为空</div>');
           }
+        } else if (isPpt) {
+          const pptxPreview: any = await import(/* @vite-ignore */ 'https://esm.sh/pptx-preview@0.3.0');
+          const renderFn = pptxPreview.render || pptxPreview.preview || pptxPreview.default?.render || pptxPreview.default;
+          if (typeof renderFn !== 'function') {
+            throw new Error('pptx-preview 组件加载失败');
+          }
+          const container = document.createElement('div');
+          await renderFn(buffer, container, {
+            slideMode: true,
+            keyBoardShortCut: false,
+            width: '100%'
+          });
+          if (!cancelled) {
+            setPptHtml(container.innerHTML || '<div class="p-4">PPT 内容为空</div>');
+          }
         } else if (isPdf) {
           const pdfjs: any = await import(/* @vite-ignore */ 'https://esm.sh/pdfjs-dist@4.8.69/build/pdf.min.mjs');
           pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
@@ -283,7 +301,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
     return () => {
       cancelled = true;
     };
-  }, [previewSource, isOffice, isExcel, isDocx, isPdf, refreshToken]);
+  }, [previewSource, isOffice, isExcel, isDocx, isPpt, isPdf, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -349,8 +367,14 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
             {!loading && error && <div className="text-red-700 text-sm bg-red-50 p-4">Office 预览失败：{error}</div>}
 
             {!loading && !error && isDocx && docxHtml && (
-              <DragScrollable className="w-full h-full overflow-auto">
-                <div className="min-w-max min-h-full" dangerouslySetInnerHTML={{ __html: docxHtml }} />
+              <DragScrollable className="w-full h-full overflow-auto p-4">
+                <div className="min-w-max min-h-max" dangerouslySetInnerHTML={{ __html: docxHtml }} />
+              </DragScrollable>
+            )}
+
+            {!loading && !error && isPpt && pptHtml && (
+              <DragScrollable className="w-full h-full overflow-auto p-4 bg-slate-50">
+                <div className="min-w-max min-h-max" dangerouslySetInnerHTML={{ __html: pptHtml }} />
               </DragScrollable>
             )}
 
