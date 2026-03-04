@@ -37,6 +37,42 @@ const dataUriToArrayBuffer = (dataUri: string) => {
   return bytes.buffer;
 };
 
+const loadPptxPreviewModule = async () => {
+  const sources = [
+    'https://esm.sh/pptx-preview@1.0.2',
+    'https://cdn.jsdelivr.net/npm/pptx-preview@1.0.2/+esm',
+    'https://unpkg.com/pptx-preview@1.0.2/dist/pptx-preview.es.js',
+  ];
+
+  let lastError: unknown;
+  for (const source of sources) {
+    try {
+      return await import(/* @vite-ignore */ source);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('无法加载 pptx-preview 依赖');
+};
+
+const resolvePptxRenderFn = (mod: any) => {
+  const candidates = [
+    mod?.render,
+    mod?.preview,
+    mod?.renderPptx,
+    mod?.pptxPreview,
+    mod?.default,
+    mod?.default?.render,
+    mod?.default?.preview,
+    mod?.default?.renderPptx,
+    mod?.default?.pptxPreview,
+  ];
+
+  const renderer = candidates.find((candidate) => typeof candidate === 'function');
+  return renderer || null;
+};
+
 const DragScrollable: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -261,10 +297,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
             setDocxHtml(container.innerHTML || '<div class="p-4">文档内容为空</div>');
           }
         } else if (isPpt) {
-          const pptxPreview: any = await import(/* @vite-ignore */ 'https://esm.sh/pptx-preview@1.0.2');
-          const renderFn = pptxPreview.render || pptxPreview.preview || pptxPreview.default?.render || pptxPreview.default;
+          const pptxPreview: any = await loadPptxPreviewModule();
+          const renderFn = resolvePptxRenderFn(pptxPreview);
           if (typeof renderFn !== 'function') {
-            throw new Error('pptx-preview 组件加载失败');
+            const moduleKeys = Object.keys(pptxPreview || {}).join(', ');
+            throw new Error(`pptx-preview 组件加载失败（导出：${moduleKeys || '空'}）`);
           }
           const container = document.createElement('div');
           await renderFn(buffer, container, {
