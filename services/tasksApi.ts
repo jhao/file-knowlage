@@ -10,3 +10,7 @@ export const listTaskExecutionLogs = async (taskId: string) => {
   const result = await apiRequest<{ items: AITaskExecutionLog[] }>(`/api/tasks/${encodeURIComponent(taskId)}/logs`);
   return result.items;
 };
+
+export const deleteTask = async (taskId: string) => {
+  await apiRequest(`/api/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
+};

@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { listTaskExecutionLogs, listTasks } from '../services/tasksApi';
+import React, { useEffect, useRef, useState } from 'react';
+import { deleteTask, listTaskExecutionLogs, listTasks } from '../services/tasksApi';
 import { AITaskExecutionLog, AITaskLog } from '../types';
 
 interface BackendJobsViewProps {
   focusTaskId?: string | null;
 }
+
+const primaryBtn = 'bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60';
+const subtleBtn = 'text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-sm font-medium';
 
 const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
   const [items, setItems] = useState<AITaskLog[]>([]);
@@ -12,6 +15,8 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [executionLogs, setExecutionLogs] = useState<AITaskExecutionLog[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const openedByFocusRef = useRef<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -32,12 +37,29 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
     }
   };
 
+  const handleDeleteJob = async (taskId: string) => {
+    if (!window.confirm(`确认删除任务 ${taskId}？删除后不会再触发 AI 调用。`)) return;
+    setDeletingTaskId(taskId);
+    try {
+      await deleteTask(taskId);
+      await load();
+      if (activeTaskId === taskId) {
+        setActiveTaskId(null);
+        setExecutionLogs([]);
+      }
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
 
   useEffect(() => {
     if (!focusTaskId) return;
+    if (openedByFocusRef.current === focusTaskId) return;
+    openedByFocusRef.current = focusTaskId;
     openJobDetail(focusTaskId);
   }, [focusTaskId]);
 
@@ -46,11 +68,9 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">后台job管理</h2>
-          <p className="text-slate-500 mt-1">查看 AI 解析队列进度与调用日志。</p>
+          <p className="text-slate-500 mt-1">查看 AI 解析队列进度、调用日志并支持删除任务。</p>
         </div>
-        <button className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm" onClick={load} disabled={loading}>
-          {loading ? '刷新中...' : '刷新'}
-        </button>
+        <button className={primaryBtn} onClick={load} disabled={loading}>{loading ? '刷新中...' : '刷新'}</button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -63,6 +83,7 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
               <th className="px-4 py-3 text-left">状态</th>
               <th className="px-4 py-3 text-left">日志消息</th>
               <th className="px-4 py-3 text-left">更新时间</th>
+              <th className="px-4 py-3 text-left">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -78,12 +99,15 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
                 <td className="px-4 py-3">{job.status}</td>
                 <td className="px-4 py-3">{job.message || '-'}</td>
                 <td className="px-4 py-3 text-slate-500">{new Date(job.updatedAt).toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  <button className={subtleBtn} onClick={() => handleDeleteJob(job.taskId)} disabled={deletingTaskId === job.taskId}>
+                    {deletingTaskId === job.taskId ? '删除中...' : '删除任务'}
+                  </button>
+                </td>
               </tr>
             ))}
             {items.length === 0 && !loading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">暂无后台任务</td>
-              </tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">暂无后台任务</td></tr>
             )}
           </tbody>
         </table>

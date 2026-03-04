@@ -53,7 +53,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="馆藏总量" value={total} sub="数据库实时统计" icon={Database} color="bg-indigo-600" />
-        <StatCard title="待人工校验" value={pending} sub="需要管理员确认" icon={Clock} color="bg-amber-500" />
+        <StatCard title="AI完成解析" value={pending} sub="需要管理员确认" icon={Clock} color="bg-amber-500" />
         <StatCard title="AI 处理中" value={processing} sub="后台任务进行中" icon={FileText} color="bg-blue-500" />
         <StatCard title="已归档" value={archived} sub="已成功索引入库" icon={CheckCircle} color="bg-emerald-500" />
       </div>
