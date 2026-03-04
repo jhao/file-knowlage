@@ -80,7 +80,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
             <div className="flex-1 bg-slate-900 flex items-center justify-center"><FilePreview archiveId={activeDoc.id} fileName={activeDoc.fileName} fileType={activeDoc.fileType} contentBase64={activeDoc.contentBase64} textContent={formData.textContent} /></div>
           </div>
 
-          <div className="w-[520px] bg-white flex flex-col">
+          <div className="w-[520px] bg-white flex flex-col relative">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
               <h3 className="font-semibold text-slate-800">AI智能审查</h3>
               <button onClick={runAIAnalysis} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2" disabled={isProcessing}>{isProcessing ? <><RefreshCw size={14} className="animate-spin" />刷新中</> : '刷新结果'}</button>
