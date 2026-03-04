@@ -35,6 +35,7 @@ export interface KnowledgeEntity {
   name: string;
   type: 'Person' | 'Location' | 'Organization' | 'Event' | 'Concept';
   parentType?: 'Person' | 'Location' | 'Organization' | 'Event' | 'Concept';
+  relatedEntityIds?: string[];
   context: string; // The sentence or timestamp where this appears (Positioning)
   confidence: number;
 }
@@ -69,6 +70,7 @@ export interface ArchiveDocument {
   entities?: KnowledgeEntity[]; // Extracted knowledge
   contentBase64?: string;
   uploadedBy?: string; // User ID
+  uploadedByName?: string;
   path?: string; // Relative path/folder structure e.g. "2023_Scans/"
   aiTaskId?: string;
   aiStatus?: string;

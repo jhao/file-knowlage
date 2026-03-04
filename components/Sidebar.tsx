@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, UploadCloud, FileCheck, Library, Settings, History, Users, FileStack, Timer } from 'lucide-react';
+import { UploadCloud, FileCheck, Library, Settings, History, Users, FileStack, Timer } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface SidebarProps {
@@ -27,14 +27,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, reviewCount,
   const usedPercent = Math.min(100, Math.round((storageUsedBytes / totalStorageBytes) * 100));
 
   const menuItems = [
-    { id: 'dashboard', label: '概览', icon: LayoutDashboard },
-    { id: 'my-uploads', label: '我上传的文件', icon: FileStack },
     { id: 'upload', label: '多源数据导入', icon: UploadCloud },
-    { id: 'verification', label: 'AI 智能校验', icon: FileCheck, badge: reviewCount },
-    { id: 'jobs', label: '后台job管理', icon: Timer },
+    { id: 'my-uploads', label: '我上传的文件', icon: FileStack },
+    { id: 'verification', label: 'AI智能审查', icon: FileCheck, badge: reviewCount },
     { id: 'repository', label: '数字档案库', icon: Library },
-    ...(currentUserRole === UserRole.ADMIN ? [{ id: 'users', label: '人员权限管理', icon: Users }] : []),
+    { id: 'jobs', label: '后台job管理', icon: Timer },
     { id: 'logs', label: '系统日志', icon: History },
+    ...(currentUserRole === UserRole.ADMIN ? [{ id: 'users', label: '人员权限管理', icon: Users }] : []),
     { id: 'settings', label: '系统设置', icon: Settings },
   ];
 

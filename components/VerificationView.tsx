@@ -9,6 +9,7 @@ interface VerificationViewProps {
   onRefreshDocuments: () => Promise<void>;
   onOpenJobDetail: (taskId: string) => void;
   currentUserRole: UserRole;
+  currentUserId: string | number;
 }
 
 const ENTITY_TYPES = [
@@ -19,16 +20,21 @@ const ENTITY_TYPES = [
   { value: 'Concept', label: 'Concept（概念）' },
 ] as const;
 
-const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, onRefreshDocuments, currentUserRole }) => {
+const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, onRefreshDocuments, currentUserRole, currentUserId }) => {
   const queue = useMemo(
-    () => documents.filter((d) => d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.WAITING_MANUAL_REVIEW || d.status === ArchiveStatus.PROCESSING),
-    [documents],
+    () => documents.filter((d) => {
+      const mineOrAdmin = currentUserRole === UserRole.ADMIN || String(d.uploadedBy) === String(currentUserId);
+      const reviewStatus = d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.WAITING_MANUAL_REVIEW || d.status === ArchiveStatus.PROCESSING;
+      return mineOrAdmin && reviewStatus;
+    }),
+    [documents, currentUserRole, currentUserId],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'metadata' | 'entities' | 'content'>('metadata');
   const [formData, setFormData] = useState<Partial<ArchiveMetadata>>({});
   const [entities, setEntities] = useState<KnowledgeEntity[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [relationKeyword, setRelationKeyword] = useState('');
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -49,14 +55,16 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setIsProcessing(false);
   };
 
+  const relatedCandidates = (currentIndex: number) => entities.filter((_, idx) => idx !== currentIndex).filter((entity) => entity.name.includes(relationKeyword.trim()));
+
   if (queue.length === 0) {
-    return <div className="h-full flex flex-col items-center justify-center text-slate-500"><Check size={48} className="text-emerald-500 mb-4" /><h3 className="text-xl font-semibold text-slate-800">全部处理完毕!</h3><p>当前没有待校验的文档。</p></div>;
+    return <div className="h-full flex flex-col items-center justify-center text-slate-500"><Check size={48} className="text-emerald-500 mb-4" /><h3 className="text-xl font-semibold text-slate-800">全部处理完毕!</h3><p>当前没有待审查的文档。</p></div>;
   }
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
       <div className="w-64 bg-white border-r border-slate-200 overflow-y-auto">
-        <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-700">待校验队列 ({queue.length})</h3></div>
+        <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-700">待审查队列 ({queue.length})</h3></div>
         {queue.map((doc) => (
           <button key={doc.id} onClick={() => setSelectedId(doc.id)} className={`w-full text-left p-3 border-b border-slate-100 hover:bg-indigo-50 ${selectedId === doc.id ? 'bg-indigo-50 border-l-4 border-l-indigo-600' : ''}`}>
             <p className="text-sm font-medium text-slate-800 truncate">{doc.fileName}</p>
@@ -74,7 +82,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
 
           <div className="w-[520px] bg-white flex flex-col">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">AI 智能校验</h3>
+              <h3 className="font-semibold text-slate-800">AI智能审查</h3>
               <button onClick={runAIAnalysis} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2" disabled={isProcessing}>{isProcessing ? <><RefreshCw size={14} className="animate-spin" />刷新中</> : '刷新结果'}</button>
             </div>
 
@@ -106,15 +114,45 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
 
               {activeTab === 'entities' && (
                 <div className="space-y-3">
-                  <button onClick={() => setEntities((prev) => [...prev, { id: Date.now().toString(), name: '', type: 'Concept', parentType: 'Concept', context: '', confidence: 100 }])} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2"><Plus size={14} />添加实体</button>
+                  <button onClick={() => setEntities((prev) => [...prev, { id: Date.now().toString(), name: '', type: 'Concept', parentType: 'Concept', relatedEntityIds: [], context: '', confidence: 100 }])} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2"><Plus size={14} />添加实体</button>
                   {entities.map((entity, idx) => (
                     <div key={entity.id || idx} className="rounded-lg border border-slate-200 p-3 space-y-2">
                       <div className="flex justify-between"><span className="text-sm font-medium">实体 {idx + 1}</span><button onClick={() => setEntities((prev) => prev.filter((_, i) => i !== idx))} className="text-slate-500 hover:text-red-500"><Trash2 size={14} /></button></div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div><label className="block text-xs text-slate-500 mb-1">所属实体</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.parentType || 'Concept'} onChange={(e) => { const copy = [...entities]; copy[idx].parentType = e.target.value as KnowledgeEntity['type']; setEntities(copy); }}>{ENTITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                        <div><label className="block text-xs text-slate-500 mb-1">实体类型</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.type} onChange={(e) => { const copy = [...entities]; copy[idx].type = e.target.value as KnowledgeEntity['type']; setEntities(copy); }}>{ENTITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">所属实体</label>
+                        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.parentType || 'Concept'} onChange={(e) => { const copy = [...entities]; copy[idx].parentType = e.target.value as KnowledgeEntity['type']; copy[idx].type = e.target.value as KnowledgeEntity['type']; setEntities(copy); }}>{ENTITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
                       </div>
                       <div><label className="block text-xs text-slate-500 mb-1">实体内容</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.name} onChange={(e) => { const copy = [...entities]; copy[idx].name = e.target.value; setEntities(copy); }} /></div>
+                      <div className="space-y-2">
+                        <label className="block text-xs text-slate-500">关联其他实体（可检索多选）</label>
+                        <input value={relationKeyword} onChange={(e) => setRelationKeyword(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="输入关键字筛选实体" />
+                        <div className="max-h-24 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1">
+                          {relatedCandidates(idx).map((candidate) => (
+                            <label key={candidate.id} className="flex items-center gap-2 text-xs text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(entity.relatedEntityIds?.includes(candidate.id))}
+                                onChange={(e) => {
+                                  const copy = [...entities];
+                                  const related = new Set(copy[idx].relatedEntityIds || []);
+                                  if (e.target.checked) related.add(candidate.id);
+                                  else related.delete(candidate.id);
+                                  copy[idx].relatedEntityIds = Array.from(related);
+                                  setEntities(copy);
+                                }}
+                              />
+                              {candidate.name || `未命名实体(${candidate.id})`}
+                            </label>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(entity.relatedEntityIds || []).map((relatedId) => {
+                            const target = entities.find((item) => item.id === relatedId);
+                            if (!target) return null;
+                            return <span key={relatedId} className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs">{target.name || relatedId}</span>;
+                          })}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
