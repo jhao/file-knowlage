@@ -1,5 +1,6 @@
 import { ArchiveDocument } from '../types';
 import { apiRequest } from './apiClient';
+import { extractFilePayload } from './fileExtraction';
 
 const toDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -16,12 +17,15 @@ export const listArchives = async () => {
 
 export const createUpload = async (file: File) => {
   const previewBase64 = await toDataUrl(file);
+  const { extractedText, extractedMeta } = await extractFilePayload(file);
   const result = await apiRequest<{ archive: ArchiveDocument; taskId: string }>('/api/uploads', {
     method: 'POST',
     body: JSON.stringify({
       fileName: file.name,
       fileType: file.type,
       fileSize: file.size,
+      extractedText,
+      extractedMeta,
     }),
   });
   return { ...result.archive, contentBase64: previewBase64 };

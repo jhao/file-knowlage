@@ -1,10 +1,11 @@
+import json
 import uuid
 
 from flask import Blueprint, g, jsonify, request
 
 from .auth import log_action, log_ai_api_call, login_required, require_permission
 from .extensions import db
-from .models import AITask, Archive
+from .models import AITask, Archive, ArchiveMetadata
 
 bp = Blueprint("uploads", __name__, url_prefix="/api/uploads")
 
@@ -32,12 +33,27 @@ def create_upload():
     db.session.add(archive)
     db.session.flush()
 
+    extracted_text = str(data.get("extractedText") or "")[:10000]
+    extracted_meta = data.get("extractedMeta") or {}
+
+    if extracted_text:
+        db.session.add(
+            ArchiveMetadata(
+                archive_id=archive.id,
+                title=file_name.rsplit(".", 1)[0],
+                summary="上传阶段已提取文本，等待 AI 结构化解析。",
+                keywords="预提取,待AI",
+                text_content=extracted_text,
+                confidence_score=35,
+            )
+        )
+
     task = AITask(
         task_id=f"task-{uuid.uuid4().hex[:12]}",
         archive_id=archive.id,
         task_type="PARSE",
         status="PENDING",
-        result_message="任务已创建，等待处理",
+        result_message=f"任务已创建，等待处理。预提取信息：{json.dumps(extracted_meta, ensure_ascii=False)[:300]}",
     )
     db.session.add(task)
     db.session.commit()
