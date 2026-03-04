@@ -84,6 +84,15 @@ export interface AITaskLog {
   updatedAt: string;
 }
 
+export interface AITaskExecutionLog {
+  id: number;
+  type: string;
+  action: string;
+  detail?: string;
+  targetId?: string;
+  createdAt: string;
+}
+
 export type SystemLogType = 'ALL' | 'BACKEND_API' | 'AI_API' | 'ACTION';
 
 export interface SystemLogEntry {
