@@ -81,7 +81,7 @@ def seed_command() -> None:
             file_name="校园发展史.pdf",
             file_type="application/pdf",
             file_size=234567,
-            status="待人工校验",
+            status="AI完成解析",
             department="档案馆",
             security_level="内部",
             uploader_id=demo.id,

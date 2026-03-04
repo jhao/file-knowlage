@@ -125,6 +125,13 @@ const App: React.FC = () => {
     setCurrentView('file-detail');
   };
 
+  const handleNavigate = (view: string) => {
+    setCurrentView(view);
+    if (view === 'jobs') {
+      setFocusTaskId(null);
+    }
+  };
+
   const myDocuments = useMemo(
     () => documents.filter((d) => String(d.uploadedBy) === String(authUser?.id)),
     [documents, authUser?.id],
@@ -179,7 +186,7 @@ const App: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           currentView={currentView}
-          onNavigate={setCurrentView}
+          onNavigate={handleNavigate}
           reviewCount={reviewCount}
           currentUserRole={userRole}
           storageUsedBytes={dashboard?.metrics.storageUsedBytes || 0}

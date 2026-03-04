@@ -11,7 +11,7 @@ bp = Blueprint("reviews", __name__, url_prefix="/api/reviews")
 @login_required
 @require_permission("canApprove")
 def review_queue():
-    status = request.args.get("status") or "待人工校验"
+    status = request.args.get("status") or "AI完成解析"
     items = Archive.query.filter_by(status=status).order_by(Archive.created_at.desc()).all()
     return jsonify({"items": [item.to_dict() for item in items], "total": len(items)})
 

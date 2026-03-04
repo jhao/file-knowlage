@@ -3,7 +3,7 @@ import React from 'react';
 export enum ArchiveStatus {
   UPLOADED = 'UPLOADED',
   PROCESSING = 'PROCESSING',
-  REVIEW_NEEDED = '待人工校验',
+  REVIEW_NEEDED = 'AI完成解析',
   APPROVED = '已归档',
   REJECTED = '已驳回',
   PENDING_APPROVAL = '待审批' // For deletion/sensitive actions
@@ -33,6 +33,7 @@ export interface KnowledgeEntity {
   id: string;
   name: string;
   type: 'Person' | 'Location' | 'Organization' | 'Event' | 'Concept';
+  parentType?: 'Person' | 'Location' | 'Organization' | 'Event' | 'Concept';
   context: string; // The sentence or timestamp where this appears (Positioning)
   confidence: number;
 }

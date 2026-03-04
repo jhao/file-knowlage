@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify
 
-from .auth import login_required
-from .models import AITask, OperationLog
+from .auth import log_action, login_required, require_permission
+from .extensions import db
+from .models import AITask, Archive, OperationLog
 
 bp = Blueprint("tasks", __name__, url_prefix="/api/tasks")
 
@@ -52,3 +53,20 @@ def list_task_logs(task_id: str):
             ]
         }
     )
+
+
+@bp.delete('/<task_id>')
+@login_required
+@require_permission("canDelete")
+def delete_task(task_id: str):
+    task = AITask.query.filter_by(task_id=task_id).first_or_404()
+    archive = db.session.get(Archive, task.archive_id)
+
+    task.status = "DELETED"
+    task.result_message = "任务已删除，不再执行 AI 调用"
+    if archive is not None:
+        archive.status = "删除"
+
+    db.session.commit()
+    log_action("TASK_DELETE", "ai_task", task_id, f"删除后台任务 {task_id}，停止 AI 调用")
+    return jsonify({"message": "任务已删除"})
