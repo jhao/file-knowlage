@@ -1,5 +1,5 @@
 import React from 'react';
-import { UploadCloud, FileCheck, Library, Settings, History, Users, FileStack, Timer } from 'lucide-react';
+import { UploadCloud, FileCheck, Library, Settings, History, Users, FileStack, Timer, LayoutDashboard } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface SidebarProps {
@@ -27,6 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, reviewCount,
   const usedPercent = Math.min(100, Math.round((storageUsedBytes / totalStorageBytes) * 100));
 
   const menuItems = [
+    { id: 'dashboard', label: '概览页', icon: LayoutDashboard },
     { id: 'upload', label: '多源数据导入', icon: UploadCloud },
     { id: 'my-uploads', label: '我上传的文件', icon: FileStack },
     { id: 'verification', label: 'AI智能审查', icon: FileCheck, badge: reviewCount },
