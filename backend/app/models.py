@@ -68,6 +68,9 @@ class Archive(db.Model, TimestampMixin):
     versions = db.relationship(
         "ArchiveVersion", back_populates="archive", cascade="all, delete-orphan"
     )
+    content_record = db.relationship(
+        "ArchiveContent", back_populates="archive", uselist=False, cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> dict:
         data = {
@@ -99,6 +102,16 @@ class Archive(db.Model, TimestampMixin):
             data["aiUpdatedAt"] = latest_task.updated_at.isoformat()
 
         return data
+
+
+class ArchiveContent(db.Model, TimestampMixin):
+    __tablename__ = "archive_contents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    archive_id = db.Column(db.Integer, db.ForeignKey("archives.id"), unique=True, nullable=False, index=True)
+    content_base64 = db.Column(db.Text, nullable=True)
+
+    archive = db.relationship("Archive", back_populates="content_record")
 
 
 class ArchiveMetadata(db.Model, TimestampMixin):

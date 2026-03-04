@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Music, Video, Image as ImageIcon, FileCode2, ZoomIn, ZoomOut, RotateCcw, Download, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getArchivePreview } from '../services/archiveApi';
 
 interface FilePreviewProps {
+  archiveId?: string;
   fileName: string;
   fileType: string;
   contentBase64?: string;
@@ -88,7 +90,7 @@ const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => 
   );
 };
 
-const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBase64, textContent }) => {
+const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType, contentBase64, textContent }) => {
   const ext = getExtension(fileName);
   const isVideo = fileType.startsWith('video/');
   const isAudio = fileType.startsWith('audio/');
@@ -102,6 +104,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
+  const [remoteContentBase64, setRemoteContentBase64] = useState<string | undefined>(contentBase64);
+  const [isFetchingSource, setIsFetchingSource] = useState(false);
 
   const [docxHtml, setDocxHtml] = useState('');
   const [excelSheets, setExcelSheets] = useState<ExcelSheetData[]>([]);
@@ -113,6 +117,43 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
   const [pdfScale, setPdfScale] = useState(1.2);
   const [pdfJumpValue, setPdfJumpValue] = useState('1');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+
+  useEffect(() => {
+    if (contentBase64) {
+      setRemoteContentBase64(contentBase64);
+    }
+  }, [contentBase64]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPreview = async () => {
+      if (!archiveId) {
+        setRemoteContentBase64(contentBase64);
+        return;
+      }
+      setIsFetchingSource(true);
+      try {
+        const nextContent = await getArchivePreview(archiveId);
+        if (!cancelled) {
+          setRemoteContentBase64(nextContent || contentBase64);
+        }
+      } catch {
+        if (!cancelled) {
+          setRemoteContentBase64(contentBase64);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsFetchingSource(false);
+        }
+      }
+    };
+
+    loadPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [archiveId, refreshToken, contentBase64]);
 
   const resetPreviewState = () => {
     setError('');
@@ -127,9 +168,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
   };
 
   const handleDownloadSource = () => {
-    if (!contentBase64) return;
+    if (!previewSource) return;
     const a = document.createElement('a');
-    a.href = contentBase64;
+    a.href = previewSource;
     a.download = fileName || 'source-file';
     document.body.appendChild(a);
     a.click();
@@ -140,7 +181,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
     let cancelled = false;
 
     const buildPreview = async () => {
-      if (!contentBase64 || !isOffice) {
+      if (!previewSource || !isOffice) {
         resetPreviewState();
         setLoading(false);
         return;
@@ -151,7 +192,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
       resetPreviewState();
 
       try {
-        const buffer = dataUriToArrayBuffer(contentBase64);
+        const buffer = dataUriToArrayBuffer(previewSource);
 
         if (isExcel) {
           const ExcelModule: any = await import(/* @vite-ignore */ 'https://esm.sh/exceljs@4.3.0');
@@ -207,7 +248,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
     return () => {
       cancelled = true;
     };
-  }, [contentBase64, isOffice, isExcel, isDocx, isPdf, refreshToken]);
+  }, [previewSource, isOffice, isExcel, isDocx, isPdf, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,9 +274,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
     };
   }, [pdfDoc, pdfPage, pdfScale]);
 
-  const resolvedText = useMemo(() => textContent || (contentBase64 ? decodeTextFromDataUri(contentBase64) : ''), [textContent, contentBase64]);
+  const previewSource = remoteContentBase64 || contentBase64;
+  const resolvedText = useMemo(() => textContent || (previewSource ? decodeTextFromDataUri(previewSource) : ''), [textContent, previewSource]);
   const activeSheet = excelSheets[activeSheetIndex];
-  const canShowPreviewControls = Boolean(contentBase64);
+  const canShowPreviewControls = Boolean(previewSource);
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900">
@@ -247,7 +289,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
       )}
 
       <div className="flex-1 overflow-hidden flex items-center justify-center">
-        {!contentBase64 && !textContent && (
+        {isFetchingSource && <div className="text-slate-200 text-sm">正在加载文件预览...</div>}
+        {!previewSource && !textContent && !isFetchingSource && (
           <div className="text-white text-center opacity-70 max-w-md px-8">
             <FileText size={56} className="mx-auto mb-4" />
             <p className="font-medium">暂无可预览内容</p>
@@ -255,18 +298,18 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
           </div>
         )}
 
-        {isImage && contentBase64 && <ZoomableImage key={refreshToken} src={contentBase64} alt="Preview" />}
+        {isImage && previewSource && <ZoomableImage key={refreshToken} src={previewSource} alt="Preview" />}
 
-        {isVideo && contentBase64 && <video key={refreshToken} controls src={contentBase64} className="max-w-full max-h-full" />}
+        {isVideo && previewSource && <video key={refreshToken} controls src={previewSource} className="max-w-full max-h-full" />}
 
-        {isAudio && contentBase64 && (
+        {isAudio && previewSource && (
           <div className="bg-slate-800 p-8 rounded-xl flex flex-col items-center gap-4">
             <Music size={48} className="text-white" />
-            <audio key={refreshToken} controls src={contentBase64} />
+            <audio key={refreshToken} controls src={previewSource} />
           </div>
         )}
 
-        {isOffice && contentBase64 && (
+        {isOffice && previewSource && (
           <div className="w-full h-full bg-white text-slate-700 overflow-auto">
             {loading && <div className="p-4 text-sm">文档解析中，请稍候...</div>}
             {!loading && error && <div className="text-red-700 text-sm bg-red-50 p-4">Office 预览失败：{error}</div>}
@@ -359,7 +402,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
           </pre>
         )}
 
-        {!isImage && !isVideo && !isAudio && !isOffice && !isText && (contentBase64 || textContent) && (
+        {!isImage && !isVideo && !isAudio && !isOffice && !isText && (previewSource || textContent) && (
           <div className="text-white text-center opacity-70 max-w-md px-8">
             <div className="flex justify-center gap-2 mb-4">
               <ImageIcon size={28} />

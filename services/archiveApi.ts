@@ -26,6 +26,7 @@ export const createUpload = async (file: File) => {
       fileSize: file.size,
       extractedText,
       extractedMeta,
+      contentBase64: previewBase64,
     }),
   });
   return { ...result.archive, contentBase64: previewBase64 };
@@ -53,4 +54,10 @@ export const rejectArchive = async (documentId: string) => {
     body: JSON.stringify({}),
   });
   return result.item;
+};
+
+
+export const getArchivePreview = async (documentId: string) => {
+  const result = await apiRequest<{ contentBase64: string | null }>(`/api/archives/${documentId}/preview`);
+  return result.contentBase64 || undefined;
 };
