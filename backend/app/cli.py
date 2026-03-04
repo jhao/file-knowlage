@@ -1,6 +1,7 @@
 import click
 from flask import Flask
 
+from .ai_batch import process_pending_tasks, worker_loop
 from .extensions import db
 from .models import AITask, Archive, ArchiveMetadata, SystemConfig, User
 
@@ -105,6 +106,23 @@ def seed_command() -> None:
     click.echo("基础数据已初始化：admin/admin123, user/user123")
 
 
+@click.command("run-ai-batch-once")
+@click.option("--batch-size", default=2, show_default=True, type=int, help="每次处理任务数量")
+def run_ai_batch_once_command(batch_size: int) -> None:
+    processed = process_pending_tasks(batch_size=max(1, batch_size))
+    click.echo(f"本次批处理完成，处理任务数：{processed}")
+
+
+@click.command("run-ai-batch-worker")
+@click.option("--interval", default=60, show_default=True, type=int, help="轮询间隔（秒）")
+@click.option("--batch-size", default=2, show_default=True, type=int, help="每次处理任务数量")
+def run_ai_batch_worker_command(interval: int, batch_size: int) -> None:
+    click.echo(f"后台任务启动：每 {max(1, interval)} 秒处理一次，每次最多 {max(1, batch_size)} 条")
+    worker_loop(interval_seconds=max(1, interval), batch_size=max(1, batch_size))
+
+
 def init_app(app: Flask) -> None:
     app.cli.add_command(init_db_command)
     app.cli.add_command(seed_command)
+    app.cli.add_command(run_ai_batch_once_command)
+    app.cli.add_command(run_ai_batch_worker_command)

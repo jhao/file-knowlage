@@ -92,7 +92,43 @@ python -m flask --app wsgi run --debug --host 0.0.0.0 --port 5009
 - `GET/PUT /api/settings`：系统配置
 - `GET /api/health`：健康检查
 
-## 4. Docker 部署
+## 4.1 后台批处理 Job（每分钟执行 / 每次2个文件）
+
+当用户上传文件后，系统会创建 AI 任务并标记为 `PENDING`（提示“任务已创建，等待处理”）。
+可通过下面命令启动后台批处理程序：
+
+```bash
+cd backend
+python -m flask --app wsgi run-ai-batch-worker --interval 60 --batch-size 2
+```
+
+说明：
+- `--interval 60`：每 60 秒轮询一次。
+- `--batch-size 2`：每次最多处理 2 个待解析任务（对应 2 个文件）。
+
+若只希望手动触发一次批处理（用于测试）：
+
+```bash
+cd backend
+python -m flask --app wsgi run-ai-batch-once --batch-size 2
+```
+
+### 批处理使用的 AI 配置
+
+批处理会读取系统配置中的以下键值：
+- `llm.provider`（如 `openai` / `kimi` / `qwen` / `glm` / `deepseek` / `local`）
+- `llm.<provider>_url`
+- `llm.<provider>_api_key`
+
+可选环境变量：
+
+```bash
+export LLM_MODEL=gpt-4o-mini
+```
+
+当 URL 或 API Key 未配置时，系统会自动使用“本地兜底解析”生成基础元数据，确保任务可继续流转至“待人工校验”。
+
+## 5. Docker 部署
 
 ```bash
 cd backend
