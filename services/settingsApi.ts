@@ -19,6 +19,12 @@ export interface LlmTestResult {
   message: string;
   detail?: string;
   provider?: string;
+  request?: {
+    url?: string;
+    payload?: unknown;
+    curl?: string;
+  };
+  response?: unknown;
 }
 
 export const listSettings = async (): Promise<SystemConfigItem[]> => {

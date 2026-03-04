@@ -10,6 +10,28 @@ from .models import SystemConfig
 bp = Blueprint("settings", __name__, url_prefix="/api/settings")
 
 
+
+DEFAULT_PROVIDER_MODELS = {
+    "kimi": "moonshot-v1-8k",
+    "qwen": "qwen-plus",
+    "glm": "glm-4-flash",
+    "deepseek": "deepseek-chat",
+    "openai": "gpt-4o-mini",
+    "local": "llama3.1:8b",
+}
+
+
+def _build_curl_command(url: str, api_key: str, payload: dict) -> str:
+    payload_json = json.dumps(payload, ensure_ascii=False)
+    escaped_payload = payload_json.replace("'", "'\''")
+    return (
+        "curl -X POST "
+        f"'{url}' "
+        "-H 'Content-Type: application/json' "
+        f"-H 'Authorization: Bearer {api_key}' "
+        f"-d '{escaped_payload}'"
+    )
+
 @bp.get("")
 @login_required
 def list_configs():
@@ -67,7 +89,7 @@ def test_llm_config():
     provider = str(data.get("provider") or "").strip().lower()
     base_url = str(data.get("baseUrl") or "").strip()
     api_key = str(data.get("apiKey") or "").strip()
-    model = str(data.get("model") or "gpt-4o-mini").strip()
+    model = str(data.get("model") or DEFAULT_PROVIDER_MODELS.get(provider, "gpt-4o-mini")).strip()
 
     if not provider or not base_url:
         return jsonify({"success": False, "message": "缺少 provider 或 baseUrl"}), 400
@@ -83,9 +105,13 @@ def test_llm_config():
         "temperature": 0,
         "max_tokens": 16,
     }
+    request_url = f"{base_url.rstrip('/')}/chat/completions"
+    request_payload_text = json.dumps(payload, ensure_ascii=False)
+    curl_command = _build_curl_command(request_url, api_key, payload)
+
     req = urllib_request.Request(
-        url=f"{base_url.rstrip('/')}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
+        url=request_url,
+        data=request_payload_text.encode("utf-8"),
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -101,12 +127,49 @@ def test_llm_config():
                 else ""
             )
             log_action("LLM_TEST", "system_config", provider, "测试大模型配置成功")
-            return jsonify({"success": True, "message": str(message or "测试调用成功")[:300], "provider": provider})
+            return jsonify(
+                {
+                    "success": True,
+                    "message": str(message or "测试调用成功")[:300],
+                    "provider": provider,
+                    "request": {
+                        "url": request_url,
+                        "payload": payload,
+                        "curl": curl_command,
+                    },
+                    "response": body,
+                }
+            )
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")[:600]
         return (
-            jsonify({"success": False, "message": f"HTTP {exc.code}", "detail": detail or str(exc)}),
+            jsonify(
+                {
+                    "success": False,
+                    "message": f"HTTP {exc.code}",
+                    "detail": detail or str(exc),
+                    "request": {
+                        "url": request_url,
+                        "payload": payload,
+                        "curl": curl_command,
+                    },
+                }
+            ),
             400,
         )
     except Exception as exc:
-        return jsonify({"success": False, "message": "测试调用失败", "detail": str(exc)[:600]}), 400
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "测试调用失败",
+                    "detail": str(exc)[:600],
+                    "request": {
+                        "url": request_url,
+                        "payload": payload,
+                        "curl": curl_command,
+                    },
+                }
+            ),
+            400,
+        )

@@ -27,6 +27,16 @@ const DEFAULT_ARCHIVE_TREE = [
 ];
 
 type LlmProvider = 'kimi' | 'qwen' | 'glm' | 'deepseek' | 'openai' | 'local';
+
+const DEFAULT_LLM_MODELS: Record<LlmProvider, string> = {
+  kimi: 'moonshot-v1-8k',
+  qwen: 'qwen-plus',
+  glm: 'glm-4-flash',
+  deepseek: 'deepseek-chat',
+  openai: 'gpt-4o-mini',
+  local: 'llama3.1:8b',
+};
+
 type EntityTypeItem = { key: string; label: string };
 type ArchiveCategoryTree = { name: string; children: string[] };
 
@@ -61,6 +71,12 @@ const SystemSettings: React.FC = () => {
   const [deepseekApiKey, setDeepseekApiKey] = useState('');
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [localApiKey, setLocalApiKey] = useState('');
+  const [kimiModel, setKimiModel] = useState(DEFAULT_LLM_MODELS.kimi);
+  const [qwenModel, setQwenModel] = useState(DEFAULT_LLM_MODELS.qwen);
+  const [glmModel, setGlmModel] = useState(DEFAULT_LLM_MODELS.glm);
+  const [deepseekModel, setDeepseekModel] = useState(DEFAULT_LLM_MODELS.deepseek);
+  const [openaiModel, setOpenaiModel] = useState(DEFAULT_LLM_MODELS.openai);
+  const [localModel, setLocalModel] = useState(DEFAULT_LLM_MODELS.local);
   const [testMessage, setTestMessage] = useState('');
   const [testDetail, setTestDetail] = useState('');
   const [testing, setTesting] = useState(false);
@@ -85,6 +101,12 @@ const SystemSettings: React.FC = () => {
         setDeepseekApiKey(map.get('llm.deepseek_api_key') || '');
         setOpenaiApiKey(map.get('llm.openai_api_key') || '');
         setLocalApiKey(map.get('llm.local_api_key') || '');
+        setKimiModel(map.get('llm.kimi_model') || DEFAULT_LLM_MODELS.kimi);
+        setQwenModel(map.get('llm.qwen_model') || DEFAULT_LLM_MODELS.qwen);
+        setGlmModel(map.get('llm.glm_model') || DEFAULT_LLM_MODELS.glm);
+        setDeepseekModel(map.get('llm.deepseek_model') || DEFAULT_LLM_MODELS.deepseek);
+        setOpenaiModel(map.get('llm.openai_model') || DEFAULT_LLM_MODELS.openai);
+        setLocalModel(map.get('llm.local_model') || DEFAULT_LLM_MODELS.local);
       })
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : '设置加载失败'))
       .finally(() => setLoading(false));
@@ -107,6 +129,16 @@ const SystemSettings: React.FC = () => {
     if (llmProvider === 'local') return localApiKey;
     return kimiApiKey;
   }, [llmProvider, kimiApiKey, qwenApiKey, glmApiKey, deepseekApiKey, openaiApiKey, localApiKey]);
+
+
+  const activeProviderModel = useMemo(() => {
+    if (llmProvider === 'qwen') return qwenModel;
+    if (llmProvider === 'glm') return glmModel;
+    if (llmProvider === 'deepseek') return deepseekModel;
+    if (llmProvider === 'openai') return openaiModel;
+    if (llmProvider === 'local') return localModel;
+    return kimiModel;
+  }, [llmProvider, kimiModel, qwenModel, glmModel, deepseekModel, openaiModel, localModel]);
 
   const saveGeneral = async () => {
     setSaving(true);
@@ -141,13 +173,13 @@ const SystemSettings: React.FC = () => {
     setSaving(true);
     setErrorMessage('');
     try {
-      const providerSettings: Record<LlmProvider, { urlKey: string; urlValue: string; tokenKey: string; tokenValue: string; providerName: string }> = {
-        kimi: { urlKey: 'llm.kimi_url', urlValue: kimiUrl, tokenKey: 'llm.kimi_api_key', tokenValue: kimiApiKey, providerName: 'Kimi' },
-        qwen: { urlKey: 'llm.qwen_url', urlValue: qwenUrl, tokenKey: 'llm.qwen_api_key', tokenValue: qwenApiKey, providerName: '千问' },
-        glm: { urlKey: 'llm.glm_url', urlValue: glmUrl, tokenKey: 'llm.glm_api_key', tokenValue: glmApiKey, providerName: 'GLM-4.6V' },
-        deepseek: { urlKey: 'llm.deepseek_url', urlValue: deepseekUrl, tokenKey: 'llm.deepseek_api_key', tokenValue: deepseekApiKey, providerName: 'DeepSeek' },
-        openai: { urlKey: 'llm.openai_url', urlValue: openaiUrl, tokenKey: 'llm.openai_api_key', tokenValue: openaiApiKey, providerName: 'OpenAI' },
-        local: { urlKey: 'llm.local_url', urlValue: localUrl, tokenKey: 'llm.local_api_key', tokenValue: localApiKey, providerName: '本地大模型' },
+      const providerSettings: Record<LlmProvider, { urlKey: string; urlValue: string; tokenKey: string; tokenValue: string; modelKey: string; modelValue: string; providerName: string }> = {
+        kimi: { urlKey: 'llm.kimi_url', urlValue: kimiUrl, tokenKey: 'llm.kimi_api_key', tokenValue: kimiApiKey, modelKey: 'llm.kimi_model', modelValue: kimiModel, providerName: 'Kimi' },
+        qwen: { urlKey: 'llm.qwen_url', urlValue: qwenUrl, tokenKey: 'llm.qwen_api_key', tokenValue: qwenApiKey, modelKey: 'llm.qwen_model', modelValue: qwenModel, providerName: '千问' },
+        glm: { urlKey: 'llm.glm_url', urlValue: glmUrl, tokenKey: 'llm.glm_api_key', tokenValue: glmApiKey, modelKey: 'llm.glm_model', modelValue: glmModel, providerName: 'GLM-4.6V' },
+        deepseek: { urlKey: 'llm.deepseek_url', urlValue: deepseekUrl, tokenKey: 'llm.deepseek_api_key', tokenValue: deepseekApiKey, modelKey: 'llm.deepseek_model', modelValue: deepseekModel, providerName: 'DeepSeek' },
+        openai: { urlKey: 'llm.openai_url', urlValue: openaiUrl, tokenKey: 'llm.openai_api_key', tokenValue: openaiApiKey, modelKey: 'llm.openai_model', modelValue: openaiModel, providerName: 'OpenAI' },
+        local: { urlKey: 'llm.local_url', urlValue: localUrl, tokenKey: 'llm.local_api_key', tokenValue: localApiKey, modelKey: 'llm.local_model', modelValue: localModel, providerName: '本地大模型' },
       };
 
       const selected = providerSettings[llmProvider];
@@ -155,6 +187,7 @@ const SystemSettings: React.FC = () => {
         updateSetting('llm.provider', llmProvider, '文档抽取大模型提供商'),
         updateSetting(selected.urlKey, selected.urlValue, `${selected.providerName} API 基础地址`),
         updateSetting(selected.tokenKey, selected.tokenValue, `${selected.providerName} API Token/API Key`),
+        updateSetting(selected.modelKey, selected.modelValue, `${selected.providerName} 默认模型`),
       ]);
       alert('大模型接口配置已保存');
     } catch (error) {
@@ -169,9 +202,10 @@ const SystemSettings: React.FC = () => {
     setTestMessage('');
     setTestDetail('');
     try {
-      const result = await testLlmSetting({ provider: llmProvider, baseUrl: activeProviderUrl, apiKey: activeProviderToken });
+      const result = await testLlmSetting({ provider: llmProvider, baseUrl: activeProviderUrl, apiKey: activeProviderToken, model: activeProviderModel });
       setTestMessage(result.message || '测试调用成功');
-      setTestDetail(result.detail || '');
+      const detailBlocks = [result.detail, result.request?.curl ? `请求 CURL：\n${result.request.curl}` : '', result.response ? `响应 JSON：\n${JSON.stringify(result.response, null, 2)}` : ''].filter(Boolean);
+      setTestDetail(detailBlocks.join('\n\n'));
     } catch (error) {
       const message = error instanceof Error ? error.message : '测试调用失败';
       setTestMessage(message);
@@ -249,6 +283,9 @@ const SystemSettings: React.FC = () => {
               <input type="password" className="w-full border border-slate-300 rounded-lg p-2" value={activeProviderToken} onChange={(e) => {
                 if (llmProvider === 'qwen') setQwenApiKey(e.target.value); else if (llmProvider === 'glm') setGlmApiKey(e.target.value); else if (llmProvider === 'deepseek') setDeepseekApiKey(e.target.value); else if (llmProvider === 'openai') setOpenaiApiKey(e.target.value); else if (llmProvider === 'local') setLocalApiKey(e.target.value); else setKimiApiKey(e.target.value);
               }} placeholder="按所选模型服务商填写密钥" />
+              <input className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={activeProviderModel} onChange={(e) => {
+                if (llmProvider === 'qwen') setQwenModel(e.target.value); else if (llmProvider === 'glm') setGlmModel(e.target.value); else if (llmProvider === 'deepseek') setDeepseekModel(e.target.value); else if (llmProvider === 'openai') setOpenaiModel(e.target.value); else if (llmProvider === 'local') setLocalModel(e.target.value); else setKimiModel(e.target.value);
+              }} placeholder="模型名称（例如 gpt-4o-mini）" />
 
               <div className="flex gap-2">
                 <button onClick={saveLlm} disabled={saving} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"><Save size={14} /> 保存大模型配置</button>

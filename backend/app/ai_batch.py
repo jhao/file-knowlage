@@ -13,6 +13,16 @@ SYSTEM_PROMPT = (
     "并返回结构化 JSON。"
 )
 
+
+DEFAULT_PROVIDER_MODELS = {
+    "kimi": "moonshot-v1-8k",
+    "qwen": "qwen-plus",
+    "glm": "glm-4-flash",
+    "deepseek": "deepseek-chat",
+    "openai": "gpt-4o-mini",
+    "local": "llama3.1:8b",
+}
+
 ALLOWED_CATEGORIES = {
     "学籍档案",
     "人事档案",
@@ -69,7 +79,7 @@ def _provider_config() -> tuple[str, str, str, str]:
     provider = (cfg.get("llm.provider") or "local").strip().lower()
     base_url = (cfg.get(f"llm.{provider}_url") or "").strip()
     api_key = (cfg.get(f"llm.{provider}_api_key") or "").strip()
-    model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+    model = (cfg.get(f"llm.{provider}_model") or os.environ.get("LLM_MODEL") or DEFAULT_PROVIDER_MODELS.get(provider, "gpt-4o-mini")).strip()
     return provider, base_url, api_key, model
 
 
