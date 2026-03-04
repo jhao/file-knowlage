@@ -1,3 +1,6 @@
+import json
+from urllib import error, request as urllib_request
+
 from flask import Blueprint, g, jsonify, request
 
 from .auth import log_action, login_required, require_permission
@@ -41,3 +44,69 @@ def put_config(config_key: str):
     db.session.commit()
     log_action("CONFIG_UPDATE", "system_config", config_key, "更新系统配置")
     return jsonify({"key": config.config_key, "value": config.config_value})
+
+
+@bp.delete("/<string:config_key>")
+@login_required
+@require_permission("canModify")
+def delete_config(config_key: str):
+    config = SystemConfig.query.filter_by(config_key=config_key).first()
+    if config is None:
+        return jsonify({"message": "配置不存在"}), 404
+    db.session.delete(config)
+    db.session.commit()
+    log_action("CONFIG_DELETE", "system_config", config_key, "删除系统配置")
+    return jsonify({"message": "删除成功"})
+
+
+@bp.post("/llm/test")
+@login_required
+@require_permission("canModify")
+def test_llm_config():
+    data = request.get_json(silent=True) or {}
+    provider = str(data.get("provider") or "").strip().lower()
+    base_url = str(data.get("baseUrl") or "").strip()
+    api_key = str(data.get("apiKey") or "").strip()
+    model = str(data.get("model") or "gpt-4o-mini").strip()
+
+    if not provider or not base_url:
+        return jsonify({"success": False, "message": "缺少 provider 或 baseUrl"}), 400
+    if not api_key:
+        return jsonify({"success": False, "message": "请填写 API Key"}), 400
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "你是档案系统连通性测试助手。"},
+            {"role": "user", "content": "请回复：连接测试成功"},
+        ],
+        "temperature": 0,
+        "max_tokens": 16,
+    }
+    req = urllib_request.Request(
+        url=f"{base_url.rstrip('/')}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=20) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            message = (
+                body.get("choices", [{}])[0].get("message", {}).get("content")
+                if isinstance(body, dict)
+                else ""
+            )
+            log_action("LLM_TEST", "system_config", provider, "测试大模型配置成功")
+            return jsonify({"success": True, "message": str(message or "测试调用成功")[:300], "provider": provider})
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")[:600]
+        return (
+            jsonify({"success": False, "message": f"HTTP {exc.code}", "detail": detail or str(exc)}),
+            400,
+        )
+    except Exception as exc:
+        return jsonify({"success": False, "message": "测试调用失败", "detail": str(exc)[:600]}), 400
