@@ -117,6 +117,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
   const [pdfScale, setPdfScale] = useState(1.2);
   const [pdfJumpValue, setPdfJumpValue] = useState('1');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewSource = remoteContentBase64 || contentBase64;
 
 
   useEffect(() => {
@@ -274,7 +275,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
     };
   }, [pdfDoc, pdfPage, pdfScale]);
 
-  const previewSource = remoteContentBase64 || contentBase64;
   const resolvedText = useMemo(() => textContent || (previewSource ? decodeTextFromDataUri(previewSource) : ''), [textContent, previewSource]);
   const activeSheet = excelSheets[activeSheetIndex];
   const canShowPreviewControls = Boolean(previewSource);
