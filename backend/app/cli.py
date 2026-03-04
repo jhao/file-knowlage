@@ -46,16 +46,22 @@ def seed_command() -> None:
         ("llm.provider", "kimi", "文档处理大模型提供商"),
         ("llm.kimi_url", "https://api.moonshot.cn/v1", "Kimi API 基础地址"),
         ("llm.kimi_api_key", "", "Kimi API Key"),
+        ("llm.kimi_model", "moonshot-v1-8k", "Kimi 默认模型"),
         ("llm.qwen_url", "https://dashscope.aliyuncs.com/compatible-mode/v1", "千问 API 基础地址"),
         ("llm.qwen_api_key", "", "千问 API Key"),
+        ("llm.qwen_model", "qwen-plus", "千问默认模型"),
         ("llm.glm_url", "https://open.bigmodel.cn/api/paas/v4", "GLM-4.6V API 基础地址"),
         ("llm.glm_api_key", "", "GLM-4.6V API Key"),
+        ("llm.glm_model", "glm-4-flash", "GLM 默认模型"),
         ("llm.deepseek_url", "https://api.deepseek.com/v1", "DeepSeek API 基础地址"),
         ("llm.deepseek_api_key", "", "DeepSeek API Key"),
+        ("llm.deepseek_model", "deepseek-chat", "DeepSeek 默认模型"),
         ("llm.openai_url", "https://api.openai.com/v1", "OpenAI API 基础地址"),
         ("llm.openai_api_key", "", "OpenAI API Key"),
+        ("llm.openai_model", "gpt-4o-mini", "OpenAI 默认模型"),
         ("llm.local_url", "http://127.0.0.1:11434/v1", "本地大模型 API 基础地址"),
         ("llm.local_api_key", "", "本地大模型 API Key"),
+        ("llm.local_model", "llama3.1:8b", "本地大模型默认模型"),
     ]
 
     for key, value, desc in default_configs:
