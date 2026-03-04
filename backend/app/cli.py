@@ -81,7 +81,7 @@ def seed_command() -> None:
             file_name="校园发展史.pdf",
             file_type="application/pdf",
             file_size=234567,
-            status="AI完成解析",
+            status="AI处理完成",
             department="档案馆",
             security_level="内部",
             uploader_id=demo.id,
@@ -106,7 +106,7 @@ def seed_command() -> None:
                 archive_id=archive.id,
                 task_type="PARSE",
                 status="SUCCESS",
-                result_message="解析完成",
+                result_message="AI处理完成",
             )
         )
 

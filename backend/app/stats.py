@@ -15,7 +15,7 @@ bp = Blueprint("stats", __name__, url_prefix="/api/stats")
 def dashboard():
     total = db.session.query(func.count(Archive.id)).scalar() or 0
     processing = db.session.query(func.count(Archive.id)).filter(Archive.status == "PROCESSING").scalar() or 0
-    review_needed = db.session.query(func.count(Archive.id)).filter(Archive.status == "AI完成解析").scalar() or 0
+    review_needed = db.session.query(func.count(Archive.id)).filter(Archive.status.in_(["AI处理完成", "等待人工校验"])).scalar() or 0
     approved = db.session.query(func.count(Archive.id)).filter(Archive.status == "已归档").scalar() or 0
     storage_used_bytes = db.session.query(func.coalesce(func.sum(Archive.file_size), 0)).scalar() or 0
 

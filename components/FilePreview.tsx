@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Music, Video, Image as ImageIcon, FileCode2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { FileText, Music, Video, Image as ImageIcon, FileCode2, ZoomIn, ZoomOut, RotateCcw, Download, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface FilePreviewProps {
   fileName: string;
@@ -8,11 +8,9 @@ interface FilePreviewProps {
   textContent?: string;
 }
 
-interface OfficePreviewState {
-  loading: boolean;
-  error: string;
-  kind: 'none' | 'excel' | 'docx' | 'pdf';
-  html: string;
+interface ExcelSheetData {
+  name: string;
+  rows: string[][];
 }
 
 const getExtension = (fileName: string) => fileName.split('.').pop()?.toLowerCase() || '';
@@ -35,28 +33,6 @@ const dataUriToArrayBuffer = (dataUri: string) => {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes.buffer;
-};
-
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-
-const buildTableHtml = (rows: string[][], title: string) => {
-  if (!rows.length) return `<div class="p-4 text-slate-500">${escapeHtml(title)} 无可用单元格数据</div>`;
-  const body = rows
-    .map((row) => `<tr>${row.map((cell) => `<td class="border border-slate-200 px-3 py-2 text-sm align-top">${escapeHtml(cell)}</td>`).join('')}</tr>`)
-    .join('');
-  return `
-  <div class="p-4">
-    <h3 class="font-semibold text-slate-800 mb-3">${escapeHtml(title)}</h3>
-    <div class="overflow-auto border border-slate-200 rounded-lg">
-      <table class="min-w-full border-collapse bg-white">${body}</table>
-    </div>
-  </div>`;
 };
 
 const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -123,19 +99,58 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
   const isDocx = ['docx'].includes(ext) || ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(fileType);
   const isOffice = isExcel || isDocx || isPdf || ['doc', 'ppt', 'pptx'].includes(ext);
 
-  const [officePreview, setOfficePreview] = useState<OfficePreviewState>({ loading: false, error: '', kind: 'none', html: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const [docxHtml, setDocxHtml] = useState('');
+  const [excelSheets, setExcelSheets] = useState<ExcelSheetData[]>([]);
+  const [activeSheetIndex, setActiveSheetIndex] = useState(0);
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
+
+  const [pdfDoc, setPdfDoc] = useState<any | null>(null);
+  const [pdfPage, setPdfPage] = useState(1);
+  const [pdfScale, setPdfScale] = useState(1.2);
+  const [pdfJumpValue, setPdfJumpValue] = useState('1');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const resetPreviewState = () => {
+    setError('');
+    setDocxHtml('');
+    setExcelSheets([]);
+    setActiveSheetIndex(0);
+    setSelectedCell(null);
+    setPdfDoc(null);
+    setPdfPage(1);
+    setPdfScale(1.2);
+    setPdfJumpValue('1');
+  };
+
+  const handleDownloadSource = () => {
+    if (!contentBase64) return;
+    const a = document.createElement('a');
+    a.href = contentBase64;
+    a.download = fileName || 'source-file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   useEffect(() => {
     let cancelled = false;
 
     const buildPreview = async () => {
       if (!contentBase64 || !isOffice) {
-        setOfficePreview({ loading: false, error: '', kind: 'none', html: '' });
+        resetPreviewState();
+        setLoading(false);
         return;
       }
 
+      setLoading(true);
+      setError('');
+      resetPreviewState();
+
       try {
-        setOfficePreview({ loading: true, error: '', kind: 'none', html: '' });
         const buffer = dataUriToArrayBuffer(contentBase64);
 
         if (isExcel) {
@@ -143,128 +158,219 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileName, fileType, contentBa
           const Workbook = ExcelModule.Workbook || ExcelModule.default?.Workbook;
           const workbook = new Workbook();
           await workbook.xlsx.load(buffer);
-          const first = workbook.worksheets?.[0];
-          const rows: string[][] = [];
-          if (first) {
-            first.eachRow({ includeEmpty: false }, (row: any) => {
+
+          const sheets: ExcelSheetData[] = (workbook.worksheets || []).map((sheet: any) => {
+            const rows: string[][] = [];
+            sheet.eachRow({ includeEmpty: true }, (row: any) => {
               const cells: string[] = [];
               row.eachCell({ includeEmpty: true }, (cell: any) => {
                 cells.push(cell?.text ? String(cell.text) : '');
               });
               rows.push(cells);
             });
-          }
-          if (!cancelled) {
-            setOfficePreview({ loading: false, error: '', kind: 'excel', html: buildTableHtml(rows, first?.name || 'Sheet1') });
-          }
-          return;
-        }
+            return { name: sheet.name || `Sheet${sheet.id || 1}`, rows };
+          });
 
-        if (isDocx) {
+          if (!cancelled) {
+            setExcelSheets(sheets);
+          }
+        } else if (isDocx) {
           const docx = await import(/* @vite-ignore */ 'https://esm.sh/docx-preview@0.3.2');
           const container = document.createElement('div');
           await docx.renderAsync(buffer, container);
           if (!cancelled) {
-            setOfficePreview({ loading: false, error: '', kind: 'docx', html: container.innerHTML || '<div class="p-4">文档内容为空</div>' });
+            setDocxHtml(container.innerHTML || '<div class="p-4">文档内容为空</div>');
           }
-          return;
-        }
-
-        if (isPdf) {
+        } else if (isPdf) {
           const pdfjs: any = await import(/* @vite-ignore */ 'https://esm.sh/pdfjs-dist@4.8.69/build/pdf.min.mjs');
           pdfjs.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
-          const pdf = await pdfjs.getDocument({ data: buffer }).promise;
-          const pages: string[] = [];
-          for (let i = 1; i <= pdf.numPages; i += 1) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            const text = content.items.map((item: any) => item.str || '').join(' ');
-            pages.push(`<section class="mb-4"><h4 class="font-semibold mb-2">第 ${i} 页</h4><p class="text-sm leading-6 whitespace-pre-wrap">${escapeHtml(text || '（空白页）')}</p></section>`);
-          }
+          const doc = await pdfjs.getDocument({ data: buffer }).promise;
           if (!cancelled) {
-            setOfficePreview({ loading: false, error: '', kind: 'pdf', html: `<div class="p-4 bg-white">${pages.join('')}</div>` });
+            setPdfDoc(doc);
+            setPdfJumpValue('1');
           }
-          return;
+        } else {
+          setError('当前 Office 类型暂不支持直接渲染（建议上传 PDF / DOCX / XLSX）');
         }
-
-        setOfficePreview({ loading: false, error: '当前 Office 类型暂不支持直接渲染（建议上传 PDF / DOCX / XLSX）', kind: 'none', html: '' });
-      } catch (error) {
+      } catch (e) {
         if (!cancelled) {
-          setOfficePreview({
-            loading: false,
-            error: error instanceof Error ? error.message : '预览解析失败',
-            kind: 'none',
-            html: '',
-          });
+          setError(e instanceof Error ? e.message : '预览解析失败');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     };
 
     buildPreview();
-
     return () => {
       cancelled = true;
     };
-  }, [contentBase64, isOffice, isExcel, isDocx, isPdf]);
+  }, [contentBase64, isOffice, isExcel, isDocx, isPdf, refreshToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const renderPdf = async () => {
+      if (!pdfDoc || !canvasRef.current) return;
+      const page = await pdfDoc.getPage(pdfPage);
+      const viewport = page.getViewport({ scale: pdfScale });
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: context, viewport }).promise;
+      if (cancelled) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    renderPdf();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfDoc, pdfPage, pdfScale]);
 
   const resolvedText = useMemo(() => textContent || (contentBase64 ? decodeTextFromDataUri(contentBase64) : ''), [textContent, contentBase64]);
-
-  if (!contentBase64 && !textContent) {
-    return (
-      <div className="text-white text-center opacity-70 max-w-md px-8">
-        <FileText size={56} className="mx-auto mb-4" />
-        <p className="font-medium">暂无可预览内容</p>
-        <p className="text-sm mt-2">该文件已上传，可在 AI 解析完成后查看文本、元数据和状态日志。</p>
-      </div>
-    );
-  }
-
-  if (isImage && contentBase64) {
-    return <ZoomableImage src={contentBase64} alt="Preview" />;
-  }
-
-  if (isVideo && contentBase64) {
-    return <video controls src={contentBase64} className="max-w-full max-h-full" />;
-  }
-
-  if (isAudio && contentBase64) {
-    return (
-      <div className="bg-slate-800 p-8 rounded-xl flex flex-col items-center gap-4">
-        <Music size={48} className="text-white" />
-        <audio controls src={contentBase64} />
-      </div>
-    );
-  }
-
-  if (isOffice && contentBase64) {
-    if (officePreview.loading) {
-      return <div className="text-white text-sm">文档解析中，请稍候...</div>;
-    }
-    if (officePreview.error) {
-      return <div className="text-red-200 text-sm bg-red-900/30 p-4 rounded-lg">Office 预览失败：{officePreview.error}</div>;
-    }
-    if (officePreview.html) {
-      return <div className="w-full h-full overflow-auto bg-white" dangerouslySetInnerHTML={{ __html: officePreview.html }} />;
-    }
-  }
-
-  if (isText) {
-    return (
-      <pre className="w-full h-full bg-white text-slate-700 p-6 overflow-auto text-sm leading-6 whitespace-pre-wrap">
-        {resolvedText || '文本内容暂不可用'}
-      </pre>
-    );
-  }
+  const activeSheet = excelSheets[activeSheetIndex];
+  const canShowPreviewControls = Boolean(contentBase64);
 
   return (
-    <div className="text-white text-center opacity-70 max-w-md px-8">
-      <div className="flex justify-center gap-2 mb-4">
-        <ImageIcon size={28} />
-        <Video size={28} />
-        <FileCode2 size={28} />
+    <div className="w-full h-full flex flex-col bg-slate-900">
+      {canShowPreviewControls && (
+        <div className="px-3 py-2 text-xs bg-slate-800 text-slate-200 flex items-center justify-end gap-2 border-b border-slate-700">
+          <button onClick={() => setRefreshToken((v) => v + 1)} className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 inline-flex items-center gap-1"><RefreshCw size={14} /> 刷新预览</button>
+          <button onClick={handleDownloadSource} className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 inline-flex items-center gap-1"><Download size={14} /> 下载源文件</button>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-hidden flex items-center justify-center">
+        {!contentBase64 && !textContent && (
+          <div className="text-white text-center opacity-70 max-w-md px-8">
+            <FileText size={56} className="mx-auto mb-4" />
+            <p className="font-medium">暂无可预览内容</p>
+            <p className="text-sm mt-2">该文件已上传，可在 AI 解析完成后查看文本、元数据和状态日志。</p>
+          </div>
+        )}
+
+        {isImage && contentBase64 && <ZoomableImage key={refreshToken} src={contentBase64} alt="Preview" />}
+
+        {isVideo && contentBase64 && <video key={refreshToken} controls src={contentBase64} className="max-w-full max-h-full" />}
+
+        {isAudio && contentBase64 && (
+          <div className="bg-slate-800 p-8 rounded-xl flex flex-col items-center gap-4">
+            <Music size={48} className="text-white" />
+            <audio key={refreshToken} controls src={contentBase64} />
+          </div>
+        )}
+
+        {isOffice && contentBase64 && (
+          <div className="w-full h-full bg-white text-slate-700 overflow-auto">
+            {loading && <div className="p-4 text-sm">文档解析中，请稍候...</div>}
+            {!loading && error && <div className="text-red-700 text-sm bg-red-50 p-4">Office 预览失败：{error}</div>}
+
+            {!loading && !error && isDocx && docxHtml && <div className="w-full h-full overflow-auto" dangerouslySetInnerHTML={{ __html: docxHtml }} />}
+
+            {!loading && !error && isExcel && (
+              <div className="h-full flex flex-col">
+                <div className="border-b border-slate-200 px-3 py-2 flex gap-2 overflow-auto">
+                  {excelSheets.map((sheet, idx) => (
+                    <button
+                      key={sheet.name}
+                      onClick={() => {
+                        setActiveSheetIndex(idx);
+                        setSelectedCell(null);
+                      }}
+                      className={`px-3 py-1 rounded text-xs whitespace-nowrap ${activeSheetIndex === idx ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {sheet.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1 overflow-auto p-3">
+                  {!activeSheet && <div className="text-sm text-slate-500">未解析到可展示的 Sheet。</div>}
+                  {activeSheet && (
+                    <table className="min-w-full border-collapse text-sm">
+                      <tbody>
+                        {activeSheet.rows.map((row, rIdx) => (
+                          <tr key={`r-${rIdx}`}>
+                            {row.map((cell, cIdx) => {
+                              const selected = selectedCell?.row === rIdx && selectedCell?.col === cIdx;
+                              return (
+                                <td
+                                  key={`c-${cIdx}`}
+                                  onClick={() => setSelectedCell({ row: rIdx, col: cIdx })}
+                                  className={`border border-slate-200 px-3 py-2 align-top cursor-pointer select-text ${selected ? 'bg-indigo-100 border-indigo-400' : 'bg-white hover:bg-slate-50'}`}
+                                >
+                                  {cell || '\u00A0'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!loading && !error && isPdf && pdfDoc && (
+              <div className="h-full flex flex-col items-center bg-slate-100">
+                <div className="w-full bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <button className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200" onClick={() => setPdfScale((s) => Math.max(0.5, s - 0.2))}><ZoomOut size={14} /></button>
+                    <button className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200" onClick={() => setPdfScale((s) => Math.min(3, s + 0.2))}><ZoomIn size={14} /></button>
+                    <span>缩放 {Math.round(pdfScale * 100)}%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50" disabled={pdfPage <= 1} onClick={() => { setPdfPage((p) => Math.max(1, p - 1)); setPdfJumpValue(String(Math.max(1, pdfPage - 1))); }}><ChevronLeft size={14} /></button>
+                    <span>第 {pdfPage} / {pdfDoc.numPages} 页</span>
+                    <button className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50" disabled={pdfPage >= pdfDoc.numPages} onClick={() => { setPdfPage((p) => Math.min(pdfDoc.numPages, p + 1)); setPdfJumpValue(String(Math.min(pdfDoc.numPages, pdfPage + 1))); }}><ChevronRight size={14} /></button>
+                    <input
+                      value={pdfJumpValue}
+                      onChange={(e) => setPdfJumpValue(e.target.value.replace(/\D/g, ''))}
+                      className="w-14 px-2 py-1 border border-slate-300 rounded"
+                    />
+                    <button
+                      className="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500"
+                      onClick={() => {
+                        const page = Number(pdfJumpValue || '1');
+                        const safePage = Math.min(Math.max(page, 1), pdfDoc.numPages);
+                        setPdfPage(safePage);
+                        setPdfJumpValue(String(safePage));
+                      }}
+                    >跳转</button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto w-full flex justify-center py-4">
+                  <canvas ref={canvasRef} className="shadow-lg bg-white" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isText && (
+          <pre className="w-full h-full bg-white text-slate-700 p-6 overflow-auto text-sm leading-6 whitespace-pre-wrap">
+            {resolvedText || '文本内容暂不可用'}
+          </pre>
+        )}
+
+        {!isImage && !isVideo && !isAudio && !isOffice && !isText && (contentBase64 || textContent) && (
+          <div className="text-white text-center opacity-70 max-w-md px-8">
+            <div className="flex justify-center gap-2 mb-4">
+              <ImageIcon size={28} />
+              <Video size={28} />
+              <FileCode2 size={28} />
+            </div>
+            <p className="font-medium">当前格式暂不支持直接版式预览</p>
+            <p className="text-sm mt-2">可查看解析文本、元数据、实体和 AI 状态日志。</p>
+          </div>
+        )}
       </div>
-      <p className="font-medium">当前格式暂不支持直接版式预览</p>
-      <p className="text-sm mt-2">可查看解析文本、元数据、实体和 AI 状态日志。</p>
     </div>
   );
 };

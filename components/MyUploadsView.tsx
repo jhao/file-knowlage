@@ -27,7 +27,8 @@ const MyUploadsView: React.FC<MyUploadsViewProps> = ({ documents, onViewDocument
   const getStatusBadge = (status: ArchiveStatus) => {
       switch(status) {
           case ArchiveStatus.APPROVED: return <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100"><CheckCircle2 size={10}/> 已归档</span>;
-          case ArchiveStatus.REVIEW_NEEDED: return <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-amber-100"><AlertCircle size={10}/> 待校验</span>;
+          case ArchiveStatus.REVIEW_NEEDED: return <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-amber-100"><AlertCircle size={10}/> AI处理完成</span>;
+          case ArchiveStatus.WAITING_MANUAL_REVIEW: return <span className="flex items-center gap-1 text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-orange-100"><AlertCircle size={10}/> 等待人工校验</span>;
           case ArchiveStatus.PROCESSING: return <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-[10px] font-bold border border-blue-100"><Clock size={10}/> AI处理中</span>;
           default: return <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full text-[10px]">{status}</span>;
       }

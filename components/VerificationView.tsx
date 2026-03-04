@@ -21,7 +21,7 @@ const ENTITY_TYPES = [
 
 const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, onRefreshDocuments, currentUserRole }) => {
   const queue = useMemo(
-    () => documents.filter((d) => d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.PROCESSING),
+    () => documents.filter((d) => d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.WAITING_MANUAL_REVIEW || d.status === ArchiveStatus.PROCESSING),
     [documents],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);

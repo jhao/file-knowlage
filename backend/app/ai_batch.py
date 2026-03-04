@@ -206,8 +206,8 @@ def _save_parse_result(task: AITask, archive: Archive, result: dict) -> None:
         )
 
     task.status = "SUCCESS"
-    task.result_message = "解析完成"
-    archive.status = "AI完成解析"
+    task.result_message = "AI处理完成"
+    archive.status = "AI处理完成"
 
 
 def process_pending_tasks(batch_size: int = 2) -> int:

@@ -3,7 +3,8 @@ import React from 'react';
 export enum ArchiveStatus {
   UPLOADED = 'UPLOADED',
   PROCESSING = 'PROCESSING',
-  REVIEW_NEEDED = 'AI完成解析',
+  REVIEW_NEEDED = 'AI处理完成',
+  WAITING_MANUAL_REVIEW = '等待人工校验',
   APPROVED = '已归档',
   REJECTED = '已驳回',
   PENDING_APPROVAL = '待审批' // For deletion/sensitive actions
