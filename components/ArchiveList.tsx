@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArchiveDocument, ArchiveStatus } from '../types';
-import { Download, FileText, Folder, Search } from 'lucide-react';
+import { Download, FileText, Folder, Search, Network } from 'lucide-react';
 import { listSettings } from '../services/settingsApi';
 
 interface ArchiveListProps {
@@ -11,6 +11,16 @@ interface ArchiveListProps {
 type ArchiveCategoryTree = { name: string; children: string[] };
 
 type SearchMode = 'smart' | 'detail';
+type ViewMode = 'directory' | 'graph';
+
+interface GraphEntityNode {
+  id: string;
+  name: string;
+  type: string;
+  docIds: string[];
+  docTitles: string[];
+  related: string[];
+}
 
 const DEFAULT_ARCHIVE_TREE: ArchiveCategoryTree[] = [
   { name: '学籍档案', children: ['本科生学籍', '研究生学籍'] },
@@ -53,6 +63,10 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ documents, onViewDocument }) 
   const [detailEntityKeyword, setDetailEntityKeyword] = useState('');
   const [detailDate, setDetailDate] = useState('');
   const [detailCategory, setDetailCategory] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('directory');
+  const [graphEntityType, setGraphEntityType] = useState('');
+  const [graphEntityName, setGraphEntityName] = useState('');
+  const [expandedGraphNodes, setExpandedGraphNodes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     listSettings().then((items) => {
@@ -69,6 +83,15 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ documents, onViewDocument }) 
   }, []);
 
   const archivedDocs = useMemo(() => documents.filter((d) => d.status === ArchiveStatus.APPROVED), [documents]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    archivedDocs.forEach((doc) => {
+      const cat = doc.metadata?.category;
+      if (cat) counts.set(cat, (counts.get(cat) || 0) + 1);
+    });
+    return counts;
+  }, [archivedDocs]);
 
   const allCategories = useMemo(() => {
     const fromTree = categoryTree.flatMap((item) => [item.name, ...(item.children || [])]);
@@ -110,17 +133,113 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ documents, onViewDocument }) 
     return result;
   }, [archivedDocs, selectedCategory, searchMode, smartQuery, detailDate, detailCategory, detailEntityKeyword, detailKeyword]);
 
+  const graphData = useMemo(() => {
+    const map = new Map<string, GraphEntityNode>();
+
+    filteredDocs.forEach((doc) => {
+      const entities = (doc.entities || []).filter((entity) => {
+        const typeMatch = !graphEntityType || entity.type === graphEntityType;
+        const nameMatch = !graphEntityName.trim() || entity.name.toLowerCase().includes(graphEntityName.trim().toLowerCase());
+        return typeMatch && nameMatch;
+      });
+
+      entities.forEach((entity) => {
+        const id = `${entity.type}:${entity.name}`;
+        const existing = map.get(id);
+        if (!existing) {
+          map.set(id, {
+            id,
+            name: entity.name,
+            type: entity.type,
+            docIds: [doc.id],
+            docTitles: [doc.metadata?.title || doc.fileName],
+            related: [],
+          });
+        } else {
+          if (!existing.docIds.includes(doc.id)) {
+            existing.docIds.push(doc.id);
+            existing.docTitles.push(doc.metadata?.title || doc.fileName);
+          }
+        }
+      });
+
+      for (let i = 0; i < entities.length; i += 1) {
+        for (let j = i + 1; j < entities.length; j += 1) {
+          const leftId = `${entities[i].type}:${entities[i].name}`;
+          const rightId = `${entities[j].type}:${entities[j].name}`;
+          const left = map.get(leftId);
+          const right = map.get(rightId);
+          if (left && right) {
+            if (!left.related.includes(rightId)) left.related.push(rightId);
+            if (!right.related.includes(leftId)) right.related.push(leftId);
+          }
+        }
+      }
+    });
+
+    return map;
+  }, [filteredDocs, graphEntityType, graphEntityName]);
+
+  const rootGraphNodes = useMemo(() => {
+    const arr = Array.from(graphData.values());
+    return arr.sort((a, b) => b.related.length - a.related.length).slice(0, 12);
+  }, [graphData]);
+
+  useEffect(() => {
+    const defaults = new Set<string>();
+    rootGraphNodes.forEach((node) => defaults.add(node.id));
+    setExpandedGraphNodes(defaults);
+  }, [rootGraphNodes]);
+
+  const renderGraphNode = (nodeId: string, depth: number, visited: Set<string>) => {
+    const node = graphData.get(nodeId);
+    if (!node || visited.has(nodeId) || depth > 3) return null;
+    const nextVisited = new Set(visited);
+    nextVisited.add(nodeId);
+    const isExpanded = expandedGraphNodes.has(nodeId);
+    const canExpand = node.related.length > 0;
+
+    return (
+      <div key={`${nodeId}-${depth}`} className="ml-4 border-l border-slate-200 pl-3">
+        <button
+          className="text-left w-full rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2"
+          onClick={() => {
+            setExpandedGraphNodes((prev) => {
+              const next = new Set(prev);
+              if (next.has(nodeId)) next.delete(nodeId);
+              else next.add(nodeId);
+              return next;
+            });
+          }}
+        >
+          <div className="text-xs text-indigo-600">{node.type}</div>
+          <div className="font-medium text-sm text-slate-800">{node.name}</div>
+          <div className="text-xs text-slate-500">关联文档 {node.docIds.length} | 关联实体 {node.related.length}</div>
+        </button>
+
+        {isExpanded && (
+          <div className="mt-2 space-y-2">
+            <div className="rounded border border-slate-100 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+              文档：{node.docTitles.slice(0, 5).join('、') || '暂无'}
+            </div>
+            {canExpand && depth < 3 && node.related.slice(0, 6).map((childId) => renderGraphNode(childId, depth + 1, nextVisited))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden">
       <div className="w-72 bg-white border-r border-slate-200 p-4 overflow-y-auto">
         <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Folder size={16} /> 档案资源目录</h3>
-        <button onClick={() => setSelectedCategory(null)} className={`w-full text-left text-sm px-2 py-1 rounded ${!selectedCategory ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50'}`}>全部档案</button>
+        <button onClick={() => setSelectedCategory(null)} className={`w-full text-left text-sm px-2 py-1 rounded flex justify-between ${!selectedCategory ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50'}`}><span>全部档案</span><span>{archivedDocs.length}</span></button>
         {categoryTree.map((node) => (
           <div key={node.name} className="mt-2">
-            <button onClick={() => setSelectedCategory(node.name)} className={`w-full text-left text-sm px-2 py-1 rounded ${selectedCategory === node.name ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50'}`}>{node.name}</button>
+            <button onClick={() => setSelectedCategory(node.name)} className={`w-full text-left text-sm px-2 py-1 rounded flex justify-between ${selectedCategory === node.name ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50'}`}><span>{node.name}</span><span>{(node.children || []).reduce((sum, child) => sum + (categoryCounts.get(child) || 0), 0)}</span></button>
             <div className="ml-3">
               {node.children.map((child) => (
-                <button key={`${node.name}-${child}`} onClick={() => setSelectedCategory(child)} className={`w-full text-left text-xs px-2 py-1 rounded ${selectedCategory === child ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>{child}</button>
+                <button key={`${node.name}-${child}`} onClick={() => setSelectedCategory(child)} className={`w-full text-left text-xs px-2 py-1 rounded flex justify-between ${selectedCategory === child ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}><span>{child}</span><span>{categoryCounts.get(child) || 0}</span></button>
               ))}
             </div>
           </div>
@@ -131,9 +250,15 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ documents, onViewDocument }) 
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-slate-800">数字档案库</h2>
-            <div className="flex bg-slate-100 p-1 rounded-lg text-xs">
-              <button className={`px-3 py-1 rounded ${searchMode === 'smart' ? 'bg-white' : ''}`} onClick={() => setSearchMode('smart')}>智能查询</button>
-              <button className={`px-3 py-1 rounded ${searchMode === 'detail' ? 'bg-white' : ''}`} onClick={() => setSearchMode('detail')}>详细查询</button>
+            <div className="flex items-center gap-2">
+              <div className="flex bg-slate-100 p-1 rounded-lg text-xs">
+                <button className={`px-3 py-1 rounded ${searchMode === 'smart' ? 'bg-white' : ''}`} onClick={() => setSearchMode('smart')}>智能查询</button>
+                <button className={`px-3 py-1 rounded ${searchMode === 'detail' ? 'bg-white' : ''}`} onClick={() => setSearchMode('detail')}>详细查询</button>
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-lg text-xs">
+                <button className={`px-3 py-1 rounded inline-flex items-center gap-1 ${viewMode === 'directory' ? 'bg-white' : ''}`} onClick={() => setViewMode('directory')}><Folder size={12} /> 目录</button>
+                <button className={`px-3 py-1 rounded inline-flex items-center gap-1 ${viewMode === 'graph' ? 'bg-white' : ''}`} onClick={() => setViewMode('graph')}><Network size={12} /> 知识图谱</button>
+              </div>
             </div>
           </div>
 
@@ -157,25 +282,42 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ documents, onViewDocument }) 
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-              <tr><th className="px-6 py-4">文档名称</th><th className="px-6 py-4">档案门类</th><th className="px-6 py-4">关联实体摘要</th><th className="px-6 py-4">归档日期</th><th className="px-6 py-4 text-right">操作</th></tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredDocs.map((doc) => (
-                <tr key={doc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onViewDocument && onViewDocument(doc)}>
-                  <td className="px-6 py-4"><div className="flex items-center gap-3"><FileText size={16} className="text-indigo-500" /><div><div className="font-semibold text-slate-800">{doc.metadata?.title || doc.fileName}</div><div className="text-xs text-slate-400">{doc.fileName}</div></div></div></td>
-                  <td className="px-6 py-4">{doc.metadata?.category}</td>
-                  <td className="px-6 py-4">{(doc.entities || []).slice(0, 3).map((e) => e.name).join('、')}</td>
-                  <td className="px-6 py-4">{doc.metadata?.date}</td>
-                  <td className="px-6 py-4 text-right"><button onClick={(e) => e.stopPropagation()} className="text-slate-400 hover:text-indigo-600"><Download size={16} /></button></td>
-                </tr>
-              ))}
-              {filteredDocs.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-slate-400">未检索到匹配档案</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        {viewMode === 'directory' ? (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr><th className="px-6 py-4">文档名称</th><th className="px-6 py-4">档案门类</th><th className="px-6 py-4">关联实体摘要</th><th className="px-6 py-4">归档日期</th><th className="px-6 py-4 text-right">操作</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDocs.map((doc) => (
+                  <tr key={doc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onViewDocument && onViewDocument(doc)}>
+                    <td className="px-6 py-4"><div className="flex items-center gap-3"><FileText size={16} className="text-indigo-500" /><div><div className="font-semibold text-slate-800">{doc.metadata?.title || doc.fileName}</div><div className="text-xs text-slate-400">{doc.fileName}</div></div></div></td>
+                    <td className="px-6 py-4">{doc.metadata?.category}</td>
+                    <td className="px-6 py-4">{(doc.entities || []).slice(0, 3).map((e) => e.name).join('、')}</td>
+                    <td className="px-6 py-4">{doc.metadata?.date}</td>
+                    <td className="px-6 py-4 text-right"><button onClick={(e) => e.stopPropagation()} className="text-slate-400 hover:text-indigo-600"><Download size={16} /></button></td>
+                  </tr>
+                ))}
+                {filteredDocs.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-slate-400">未检索到匹配档案</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <select value={graphEntityType} onChange={(e) => setGraphEntityType(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-2 text-sm">
+                <option value="">全部实体类型</option>
+                {['Person', 'Location', 'Organization', 'Event', 'Concept'].map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+              <input value={graphEntityName} onChange={(e) => setGraphEntityName(e.target.value)} className="border border-slate-300 rounded-lg px-2 py-2 text-sm" placeholder="按实体名称搜索" />
+            </div>
+            <p className="text-xs text-slate-500">默认展示两级（根实体 + 一级关联实体），点击实体可继续展开下一级关联。</p>
+            <div className="max-h-[60vh] overflow-auto space-y-2 pr-2">
+              {rootGraphNodes.map((node) => renderGraphNode(node.id, 1, new Set()))}
+              {rootGraphNodes.length === 0 && <div className="text-center text-sm text-slate-400 py-8">当前筛选条件下暂无实体图谱数据</div>}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
