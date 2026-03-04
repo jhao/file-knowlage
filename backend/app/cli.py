@@ -40,7 +40,9 @@ def seed_command() -> None:
 
 
     default_configs = [
-        ("entity_types", "Person,Location,Organization,Event,Concept", "知识实体分类"),
+        ("entity_types", "Person,Location,Organization,Event,Concept", "知识实体分类（兼容）"),
+        ("entity_types_json", "[{\"key\":\"Person\",\"label\":\"人物\"},{\"key\":\"Location\",\"label\":\"地点\"},{\"key\":\"Organization\",\"label\":\"组织\"},{\"key\":\"Event\",\"label\":\"事件\"},{\"key\":\"Concept\",\"label\":\"概念\"}]", "知识实体分类（JSON）"),
+        ("archive_category_tree", "[{\"name\":\"学籍档案\",\"children\":[\"本科生学籍\",\"研究生学籍\"]},{\"name\":\"人事档案\",\"children\":[\"教师人事\",\"行政人员人事\"]},{\"name\":\"科研档案\",\"children\":[\"项目档案\",\"成果档案\"]},{\"name\":\"行政档案\",\"children\":[\"制度文件\",\"会议纪要\"]}]", "档案目录与子门类配置"),
         ("llm.provider", "kimi", "文档处理大模型提供商"),
         ("llm.kimi_url", "https://api.moonshot.cn/v1", "Kimi API 基础地址"),
         ("llm.kimi_api_key", "", "Kimi API Key"),
