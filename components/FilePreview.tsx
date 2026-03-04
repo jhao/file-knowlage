@@ -37,6 +37,40 @@ const dataUriToArrayBuffer = (dataUri: string) => {
   return bytes.buffer;
 };
 
+const DragScrollable: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragStateRef = useRef({ x: 0, y: 0, left: 0, top: 0 });
+
+  return (
+    <div
+      ref={containerRef}
+      className={`${className} ${dragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`.trim()}
+      onMouseDown={(e) => {
+        if (e.button !== 0 || !containerRef.current) return;
+        setDragging(true);
+        dragStateRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          left: containerRef.current.scrollLeft,
+          top: containerRef.current.scrollTop,
+        };
+      }}
+      onMouseMove={(e) => {
+        if (!dragging || !containerRef.current) return;
+        const dx = e.clientX - dragStateRef.current.x;
+        const dy = e.clientY - dragStateRef.current.y;
+        containerRef.current.scrollLeft = dragStateRef.current.left - dx;
+        containerRef.current.scrollTop = dragStateRef.current.top - dy;
+      }}
+      onMouseUp={() => setDragging(false)}
+      onMouseLeave={() => setDragging(false)}
+    >
+      {children}
+    </div>
+  );
+};
+
 const ZoomableImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -310,11 +344,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
         )}
 
         {isOffice && previewSource && (
-          <div className="w-full h-full bg-white text-slate-700 overflow-auto">
+          <div className="w-full h-full bg-white text-slate-700 overflow-hidden">
             {loading && <div className="p-4 text-sm">文档解析中，请稍候...</div>}
             {!loading && error && <div className="text-red-700 text-sm bg-red-50 p-4">Office 预览失败：{error}</div>}
 
-            {!loading && !error && isDocx && docxHtml && <div className="w-full h-full overflow-auto" dangerouslySetInnerHTML={{ __html: docxHtml }} />}
+            {!loading && !error && isDocx && docxHtml && (
+              <DragScrollable className="w-full h-full overflow-auto">
+                <div className="min-w-max min-h-full" dangerouslySetInnerHTML={{ __html: docxHtml }} />
+              </DragScrollable>
+            )}
 
             {!loading && !error && isExcel && (
               <div className="h-full flex flex-col">
@@ -332,7 +370,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
                     </button>
                   ))}
                 </div>
-                <div className="flex-1 overflow-auto p-3">
+                <DragScrollable className="flex-1 overflow-auto p-3">
                   {!activeSheet && <div className="text-sm text-slate-500">未解析到可展示的 Sheet。</div>}
                   {activeSheet && (
                     <table className="min-w-full border-collapse text-sm">
@@ -356,7 +394,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
                       </tbody>
                     </table>
                   )}
-                </div>
+                </DragScrollable>
               </div>
             )}
 
@@ -388,18 +426,20 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
                     >跳转</button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-auto w-full flex justify-center py-4">
-                  <canvas ref={canvasRef} className="shadow-lg bg-white" />
-                </div>
+                <DragScrollable className="flex-1 overflow-auto w-full py-4">
+                  <div className="w-max mx-auto">
+                    <canvas ref={canvasRef} className="shadow-lg bg-white" />
+                  </div>
+                </DragScrollable>
               </div>
             )}
           </div>
         )}
 
         {isText && (
-          <pre className="w-full h-full bg-white text-slate-700 p-6 overflow-auto text-sm leading-6 whitespace-pre-wrap">
-            {resolvedText || '文本内容暂不可用'}
-          </pre>
+          <DragScrollable className="w-full h-full bg-white text-slate-700 p-6 overflow-auto">
+            <pre className="text-sm leading-6 whitespace-pre-wrap min-w-max min-h-full">{resolvedText || '文本内容暂不可用'}</pre>
+          </DragScrollable>
         )}
 
         {!isImage && !isVideo && !isAudio && !isOffice && !isText && (previewSource || textContent) && (
