@@ -11,8 +11,10 @@ import FileDetailView from './components/FileDetailView';
 import MyUploadsView from './components/MyUploadsView';
 import LoginView from './components/LoginView';
 import SystemLogsView from './components/SystemLogsView';
+import BackendJobsView from './components/BackendJobsView';
 import { login as loginApi, getCurrentUser, type AuthUser } from './services/authApi';
 import { approveArchive, createUpload, listArchives, rejectArchive, updateArchive } from './services/archiveApi';
+import { getDashboardStats, type DashboardStatsResponse } from './services/statsApi';
 import { ArchiveDocument, ArchiveStatus, UserRole } from './types';
 
 const App: React.FC = () => {
@@ -23,6 +25,7 @@ const App: React.FC = () => {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [dashboard, setDashboard] = useState<DashboardStatsResponse | null>(null);
 
   const refreshArchives = async () => {
     try {
@@ -30,6 +33,14 @@ const App: React.FC = () => {
       setDocuments(items);
     } catch (error) {
       console.error('加载档案失败', error);
+    }
+  };
+
+  const refreshDashboard = async () => {
+    try {
+      setDashboard(await getDashboardStats());
+    } catch (error) {
+      console.error('加载概览失败', error);
     }
   };
 
@@ -50,6 +61,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!authUser) return;
     refreshArchives();
+    refreshDashboard();
   }, [authUser]);
 
   const handleLogin = async (username: string, password: string) => {
@@ -77,7 +89,8 @@ const App: React.FC = () => {
     try {
       const uploaded = await Promise.all(files.map((file) => createUpload(file)));
       setDocuments((prev) => [...uploaded, ...prev]);
-      setCurrentView('verification');
+      await refreshDashboard();
+      setCurrentView('repository');
     } catch (error) {
       alert(error instanceof Error ? error.message : '上传失败');
     }
@@ -88,16 +101,19 @@ const App: React.FC = () => {
       if (updates.status === ArchiveStatus.APPROVED) {
         const item = await approveArchive(id);
         setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...item, ...updates } : doc)));
+        await refreshDashboard();
         return;
       }
       if (updates.status === ArchiveStatus.REJECTED) {
         const item = await rejectArchive(id);
         setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...item, ...updates } : doc)));
+        await refreshDashboard();
         return;
       }
 
       const item = await updateArchive(id, updates);
       setDocuments((prev) => prev.map((doc) => (doc.id === id ? item : doc)));
+      await refreshDashboard();
     } catch (error) {
       alert(error instanceof Error ? error.message : '更新失败');
     }
@@ -116,11 +132,13 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard documents={documents} />;
+        return <Dashboard data={dashboard} />;
       case 'upload':
         return <UploadZone onUpload={handleUpload} />;
       case 'verification':
         return <VerificationView documents={documents} onUpdateDocument={updateDocument} currentUserRole={userRole} />;
+      case 'jobs':
+        return <BackendJobsView />;
       case 'repository':
         return <ArchiveList documents={documents} onViewDocument={handleViewDocument} />;
       case 'my-uploads':
@@ -144,7 +162,7 @@ const App: React.FC = () => {
         );
       }
       default:
-        return <Dashboard documents={documents} />;
+        return <Dashboard data={dashboard} />;
     }
   };
 
@@ -163,6 +181,7 @@ const App: React.FC = () => {
           onNavigate={setCurrentView}
           reviewCount={reviewCount}
           currentUserRole={userRole}
+          storageUsedBytes={dashboard?.metrics.storageUsedBytes || 0}
         />
         <main className="flex-1 overflow-y-auto custom-scrollbar relative">{renderView()}</main>
       </div>

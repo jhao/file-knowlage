@@ -1,37 +1,33 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ArchiveDocument, ArchiveStatus } from '../types';
 import { FileText, Database, CheckCircle, Clock } from 'lucide-react';
 
-interface DashboardProps {
-  documents: ArchiveDocument[];
+interface DashboardData {
+  metrics: {
+    total: number;
+    processing: number;
+    reviewNeeded: number;
+    approved: number;
+  };
+  charts: {
+    byCategory: Array<{ name: string; value: number }>;
+    byMonth: Array<{ name: string; docs: number }>;
+  };
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ documents }) => {
-  // Compute Stats
-  const total = documents.length;
-  const archived = documents.filter(d => d.status === ArchiveStatus.APPROVED).length;
-  const pending = documents.filter(d => d.status === ArchiveStatus.REVIEW_NEEDED).length;
-  const processing = documents.filter(d => d.status === ArchiveStatus.PROCESSING).length;
+interface DashboardProps {
+  data: DashboardData | null;
+}
 
-  // Mock Data for Charts
-  const dataByType = [
-    { name: '学籍档案', value: 400 },
-    { name: '人事档案', value: 300 },
-    { name: '科研档案', value: 300 },
-    { name: '行政档案', value: 200 },
-  ];
-  const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899'];
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#0ea5e9', '#8b5cf6'];
 
-  const dataByMonth = [
-    { name: '1月', docs: 40 },
-    { name: '2月', docs: 30 },
-    { name: '3月', docs: 20 },
-    { name: '4月', docs: 27 },
-    { name: '5月', docs: 18 },
-    { name: '6月', docs: 23 },
-    { name: '7月', docs: 34 },
-  ];
+const Dashboard: React.FC<DashboardProps> = ({ data }) => {
+  const total = data?.metrics.total ?? 0;
+  const pending = data?.metrics.reviewNeeded ?? 0;
+  const processing = data?.metrics.processing ?? 0;
+  const archived = data?.metrics.approved ?? 0;
+  const dataByType = data?.charts.byCategory ?? [];
+  const dataByMonth = data?.charts.byMonth ?? [];
 
   const StatCard = ({ title, value, sub, icon: Icon, color }: any) => (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
@@ -51,46 +47,17 @@ const Dashboard: React.FC<DashboardProps> = ({ documents }) => {
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">档案概览</h2>
-          <p className="text-slate-500 mt-1">实时系统状态与处理指标。</p>
-        </div>
-        <div className="text-sm text-slate-500 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
-          最后更新: 今天, 10:42 AM
+          <p className="text-slate-500 mt-1">数据直接来自数据库统计。</p>
         </div>
       </div>
 
-      {/* Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="馆藏总量" 
-          value={total + 1240} 
-          sub="较上月增长 +12%" 
-          icon={Database} 
-          color="bg-indigo-600"
-        />
-        <StatCard 
-          title="待人工校验" 
-          value={pending} 
-          sub="需要管理员确认" 
-          icon={Clock} 
-          color="bg-amber-500"
-        />
-        <StatCard 
-          title="AI 处理中" 
-          value={processing} 
-          sub="后台任务进行中" 
-          icon={FileText} 
-          color="bg-blue-500"
-        />
-        <StatCard 
-          title="今日归档" 
-          value={archived + 24} 
-          sub="已成功索引入库" 
-          icon={CheckCircle} 
-          color="bg-emerald-500"
-        />
+        <StatCard title="馆藏总量" value={total} sub="数据库实时统计" icon={Database} color="bg-indigo-600" />
+        <StatCard title="待人工校验" value={pending} sub="需要管理员确认" icon={Clock} color="bg-amber-500" />
+        <StatCard title="AI 处理中" value={processing} sub="后台任务进行中" icon={FileText} color="bg-blue-500" />
+        <StatCard title="已归档" value={archived} sub="已成功索引入库" icon={CheckCircle} color="bg-emerald-500" />
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-96">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
           <h3 className="text-lg font-semibold text-slate-800 mb-6">数字化趋势</h3>
@@ -98,12 +65,9 @@ const Dashboard: React.FC<DashboardProps> = ({ documents }) => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dataByMonth}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <Tooltip 
-                  cursor={{fill: '#f1f5f9'}} 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} />
                 <Bar dataKey="docs" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
@@ -115,34 +79,18 @@ const Dashboard: React.FC<DashboardProps> = ({ documents }) => {
           <div className="flex-1 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={dataByType}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
+                <Pie data={dataByType} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value">
                   {dataByType.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-              <p className="text-2xl font-bold text-slate-800">1.2K</p>
+              <p className="text-2xl font-bold text-slate-800">{total}</p>
               <p className="text-xs text-slate-500">文档</p>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-             {dataByType.map((entry, index) => (
-               <div key={entry.name} className="flex items-center gap-2 text-xs text-slate-600">
-                 <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[index]}}></div>
-                 <span>{entry.name}</span>
-               </div>
-             ))}
           </div>
         </div>
       </div>
