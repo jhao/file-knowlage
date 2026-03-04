@@ -286,19 +286,20 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ documents, onViewDocument }) 
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-                <tr><th className="px-6 py-4">文档名称</th><th className="px-6 py-4">档案门类</th><th className="px-6 py-4">关联实体摘要</th><th className="px-6 py-4">归档日期</th><th className="px-6 py-4 text-right">操作</th></tr>
+                <tr><th className="px-6 py-4">文档名称</th><th className="px-6 py-4">档案门类</th><th className="px-6 py-4">上传者</th><th className="px-6 py-4">关联实体摘要</th><th className="px-6 py-4">归档日期</th><th className="px-6 py-4 text-right">操作</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredDocs.map((doc) => (
                   <tr key={doc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onViewDocument && onViewDocument(doc)}>
                     <td className="px-6 py-4"><div className="flex items-center gap-3"><FileText size={16} className="text-indigo-500" /><div><div className="font-semibold text-slate-800">{doc.metadata?.title || doc.fileName}</div><div className="text-xs text-slate-400">{doc.fileName}</div></div></div></td>
                     <td className="px-6 py-4">{doc.metadata?.category}</td>
+                    <td className="px-6 py-4">{doc.uploadedByName || doc.uploadedBy || "-"}</td>
                     <td className="px-6 py-4">{(doc.entities || []).slice(0, 3).map((e) => e.name).join('、')}</td>
                     <td className="px-6 py-4">{doc.metadata?.date}</td>
                     <td className="px-6 py-4 text-right"><button onClick={(e) => e.stopPropagation()} className="text-slate-400 hover:text-indigo-600"><Download size={16} /></button></td>
                   </tr>
                 ))}
-                {filteredDocs.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-slate-400">未检索到匹配档案</td></tr>}
+                {filteredDocs.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-slate-400">未检索到匹配档案</td></tr>}
               </tbody>
             </table>
           </div>

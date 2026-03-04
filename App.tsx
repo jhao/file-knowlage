@@ -27,7 +27,6 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState('');
   const [dashboard, setDashboard] = useState<DashboardStatsResponse | null>(null);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
-
   const refreshArchives = async () => {
     try {
       const items = await listArchives();
@@ -91,7 +90,7 @@ const App: React.FC = () => {
       const uploaded = await Promise.all(files.map((file) => createUpload(file)));
       setDocuments((prev) => [...uploaded, ...prev]);
       await refreshDashboard();
-      setCurrentView('repository');
+      setCurrentView('verification');
     } catch (error) {
       alert(error instanceof Error ? error.message : '上传失败');
     }
@@ -144,7 +143,7 @@ const App: React.FC = () => {
       case 'upload':
         return <UploadZone onUpload={handleUpload} />;
       case 'verification':
-        return <VerificationView documents={documents} onUpdateDocument={updateDocument} onRefreshDocuments={refreshArchives} onOpenJobDetail={(taskId) => { setFocusTaskId(taskId); setCurrentView('jobs'); }} currentUserRole={userRole} />;
+        return <VerificationView documents={documents} onUpdateDocument={updateDocument} onRefreshDocuments={refreshArchives} onOpenJobDetail={(taskId) => { setFocusTaskId(taskId); setCurrentView('jobs'); }} currentUserRole={userRole} currentUserId={authUser.id} />;
       case 'jobs':
         return <BackendJobsView focusTaskId={focusTaskId} />;
       case 'repository':

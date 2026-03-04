@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from flask import Blueprint, g, jsonify, request
@@ -146,6 +147,7 @@ def update_archive(document_id: str):
                     entity_type=entity.get("type") or "Concept",
                     context=entity.get("context"),
                     confidence=entity.get("confidence"),
+                    related_entity_ids=json.dumps(entity.get("relatedEntityIds") or [], ensure_ascii=False),
                 )
             )
 

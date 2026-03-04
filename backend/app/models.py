@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -82,6 +83,7 @@ class Archive(db.Model, TimestampMixin):
             "status": self.status,
             "uploadDate": self.created_at.isoformat(),
             "uploadedBy": self.uploader_id,
+            "uploadedByName": self.uploader.display_name if self.uploader else None,
             "department": self.department,
             "securityLevel": self.security_level,
         }
@@ -154,6 +156,7 @@ class ArchiveEntity(db.Model, TimestampMixin):
     entity_type = db.Column(db.String(64), nullable=False)
     context = db.Column(db.Text, nullable=True)
     confidence = db.Column(db.Float, nullable=True)
+    related_entity_ids = db.Column(db.Text, nullable=True)
 
     archive = db.relationship("Archive", back_populates="entities")
 
@@ -164,6 +167,7 @@ class ArchiveEntity(db.Model, TimestampMixin):
             "type": self.entity_type,
             "context": self.context,
             "confidence": self.confidence,
+            "relatedEntityIds": json.loads(self.related_entity_ids) if self.related_entity_ids else [],
         }
 
 
