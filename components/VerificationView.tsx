@@ -69,7 +69,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
         <div className="flex-1 flex bg-slate-100 overflow-hidden">
           <div className="flex-1 flex flex-col border-r border-slate-200">
             <div className="h-10 bg-slate-800 text-slate-300 flex items-center px-4 text-xs justify-between"><span className="flex items-center gap-2"><Eye size={14} /> 原文预览 ({activeDoc.fileName})</span><span className="flex items-center gap-1 text-amber-400"><ShieldAlert size={12} /> 防抓取保护开启</span></div>
-            <div className="flex-1 bg-slate-900 flex items-center justify-center"><FilePreview fileName={activeDoc.fileName} fileType={activeDoc.fileType} contentBase64={activeDoc.contentBase64} textContent={formData.textContent} /></div>
+            <div className="flex-1 bg-slate-900 flex items-center justify-center"><FilePreview archiveId={activeDoc.id} fileName={activeDoc.fileName} fileType={activeDoc.fileType} contentBase64={activeDoc.contentBase64} textContent={formData.textContent} /></div>
           </div>
 
           <div className="w-[520px] bg-white flex flex-col">

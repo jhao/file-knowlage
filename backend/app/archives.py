@@ -97,6 +97,18 @@ def get_archive(document_id: str):
     return jsonify({"item": archive.to_dict()})
 
 
+@bp.get("/<string:document_id>/preview")
+@login_required
+def get_archive_preview(document_id: str):
+    archive = Archive.query.filter_by(document_id=document_id).first_or_404()
+    if g.current_user.role != "管理员" and archive.uploader_id != g.current_user.id:
+        return jsonify({"message": "无权查看该档案"}), 403
+
+    if archive.content_record is None or not archive.content_record.content_base64:
+        return jsonify({"contentBase64": None})
+    return jsonify({"contentBase64": archive.content_record.content_base64})
+
+
 @bp.put("/<string:document_id>")
 @login_required
 @require_permission("canModify")

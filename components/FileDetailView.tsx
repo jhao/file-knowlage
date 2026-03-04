@@ -55,7 +55,7 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
         </div>
         <div className="flex-1 bg-slate-900 flex items-center justify-center relative overflow-hidden select-none" onContextMenu={(e) => e.preventDefault()}>
           <div className="absolute inset-0 pointer-events-none z-10 opacity-10 flex items-center justify-center"><div className="text-white text-4xl -rotate-45 font-bold">INTERNAL USE ONLY</div></div>
-          <FilePreview fileName={document.fileName} fileType={document.fileType} contentBase64={document.contentBase64} textContent={formData.textContent} />
+          <FilePreview archiveId={document.id} fileName={document.fileName} fileType={document.fileType} contentBase64={document.contentBase64} textContent={formData.textContent} />
         </div>
       </div>
 

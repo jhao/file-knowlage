@@ -5,7 +5,7 @@ from flask import Blueprint, g, jsonify, request
 
 from .auth import log_action, log_ai_api_call, login_required, require_permission
 from .extensions import db
-from .models import AITask, Archive, ArchiveMetadata
+from .models import AITask, Archive, ArchiveContent, ArchiveMetadata
 
 bp = Blueprint("uploads", __name__, url_prefix="/api/uploads")
 
@@ -35,6 +35,10 @@ def create_upload():
 
     extracted_text = str(data.get("extractedText") or "")[:10000]
     extracted_meta = data.get("extractedMeta") or {}
+
+    content_base64 = data.get("contentBase64")
+    if content_base64:
+        db.session.add(ArchiveContent(archive_id=archive.id, content_base64=str(content_base64)))
 
     if extracted_text:
         db.session.add(
