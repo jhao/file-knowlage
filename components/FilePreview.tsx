@@ -261,7 +261,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
             setDocxHtml(container.innerHTML || '<div class="p-4">文档内容为空</div>');
           }
         } else if (isPpt) {
-          const pptxPreview: any = await import(/* @vite-ignore */ 'https://esm.sh/pptx-preview@0.3.0');
+          const pptxPreview: any = await import(/* @vite-ignore */ 'https://esm.sh/pptx-preview@1.0.2');
           const renderFn = pptxPreview.render || pptxPreview.preview || pptxPreview.default?.render || pptxPreview.default;
           if (typeof renderFn !== 'function') {
             throw new Error('pptx-preview 组件加载失败');
@@ -270,7 +270,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
           await renderFn(buffer, container, {
             slideMode: true,
             keyBoardShortCut: false,
-            width: '100%'
+            width: 960
           });
           if (!cancelled) {
             setPptHtml(container.innerHTML || '<div class="p-4">PPT 内容为空</div>');
@@ -374,7 +374,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
 
             {!loading && !error && isPpt && pptHtml && (
               <DragScrollable className="w-full h-full overflow-auto p-4 bg-slate-50">
-                <div className="min-w-max min-h-max" dangerouslySetInnerHTML={{ __html: pptHtml }} />
+                <div className="inline-block min-w-full" dangerouslySetInnerHTML={{ __html: pptHtml }} />
               </DragScrollable>
             )}
 
