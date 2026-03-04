@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [dashboard, setDashboard] = useState<DashboardStatsResponse | null>(null);
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
 
   const refreshArchives = async () => {
     try {
@@ -136,9 +137,9 @@ const App: React.FC = () => {
       case 'upload':
         return <UploadZone onUpload={handleUpload} />;
       case 'verification':
-        return <VerificationView documents={documents} onUpdateDocument={updateDocument} currentUserRole={userRole} />;
+        return <VerificationView documents={documents} onUpdateDocument={updateDocument} onRefreshDocuments={refreshArchives} onOpenJobDetail={(taskId) => { setFocusTaskId(taskId); setCurrentView('jobs'); }} currentUserRole={userRole} />;
       case 'jobs':
-        return <BackendJobsView />;
+        return <BackendJobsView focusTaskId={focusTaskId} />;
       case 'repository':
         return <ArchiveList documents={documents} onViewDocument={handleViewDocument} />;
       case 'my-uploads':

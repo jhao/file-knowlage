@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { listTasks } from '../services/tasksApi';
-import { AITaskLog } from '../types';
+import { listTaskExecutionLogs, listTasks } from '../services/tasksApi';
+import { AITaskExecutionLog, AITaskLog } from '../types';
 
-const BackendJobsView: React.FC = () => {
+interface BackendJobsViewProps {
+  focusTaskId?: string | null;
+}
+
+const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
   const [items, setItems] = useState<AITaskLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [executionLogs, setExecutionLogs] = useState<AITaskExecutionLog[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -15,9 +22,24 @@ const BackendJobsView: React.FC = () => {
     }
   };
 
+  const openJobDetail = async (taskId: string) => {
+    setActiveTaskId(taskId);
+    setLoadingDetail(true);
+    try {
+      setExecutionLogs(await listTaskExecutionLogs(taskId));
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!focusTaskId) return;
+    openJobDetail(focusTaskId);
+  }, [focusTaskId]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-4">
@@ -46,7 +68,11 @@ const BackendJobsView: React.FC = () => {
           <tbody>
             {items.map((job) => (
               <tr key={`${job.taskId}-${job.updatedAt}`} className="border-t border-slate-100">
-                <td className="px-4 py-3 font-mono text-xs">{job.taskId}</td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  <button className="text-indigo-600 hover:text-indigo-700 underline" onClick={() => openJobDetail(job.taskId)}>
+                    {job.taskId}
+                  </button>
+                </td>
                 <td className="px-4 py-3">{job.archiveId}</td>
                 <td className="px-4 py-3">{job.taskType}</td>
                 <td className="px-4 py-3">{job.status}</td>
@@ -62,6 +88,28 @@ const BackendJobsView: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {activeTaskId && (
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="font-semibold text-slate-800">任务执行日志 · {activeTaskId}</h3>
+              <button onClick={() => setActiveTaskId(null)} className="text-slate-500 hover:text-slate-800">关闭</button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-auto space-y-2">
+              {loadingDetail && <div className="text-sm text-slate-500">日志加载中...</div>}
+              {!loadingDetail && executionLogs.length === 0 && <div className="text-sm text-slate-500">暂无执行日志</div>}
+              {!loadingDetail && executionLogs.map((log) => (
+                <div key={log.id} className="border border-slate-200 rounded-lg p-3">
+                  <div className="text-xs text-slate-500">{new Date(log.createdAt).toLocaleString()} · {log.type}</div>
+                  <div className="text-sm font-semibold text-slate-700 mt-1">{log.action}</div>
+                  <div className="text-sm text-slate-600 mt-1">{log.detail || '-'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

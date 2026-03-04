@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, ArchiveCategory, SecurityLevel, KnowledgeEntity, UserRole, AITaskLog } from '../types';
+import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, ArchiveCategory, SecurityLevel, KnowledgeEntity, UserRole, AITaskExecutionLog, AITaskLog } from '../types';
 import { Check, RefreshCw, Wand2, AlertTriangle, Eye, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert, X, Info } from 'lucide-react';
 import FilePreview from './FilePreview';
-import { listTasks } from '../services/tasksApi';
+import { listTaskExecutionLogs, listTasks } from '../services/tasksApi';
 
 interface VerificationViewProps {
   documents: ArchiveDocument[];
   onUpdateDocument: (id: string, updates: Partial<ArchiveDocument>) => void;
+  onRefreshDocuments: () => Promise<void>;
+  onOpenJobDetail: (taskId: string) => void;
   currentUserRole: UserRole;
 }
 
-const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, currentUserRole }) => {
+const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, onRefreshDocuments, onOpenJobDetail, currentUserRole }) => {
   const queue = useMemo(() => documents.filter((d) => d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.PROCESSING), [documents]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'metadata' | 'entities' | 'content'>('metadata');
@@ -20,6 +22,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [showLogModal, setShowLogModal] = useState(false);
   const [taskLogs, setTaskLogs] = useState<AITaskLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [selectedLogTaskId, setSelectedLogTaskId] = useState<string | null>(null);
+  const [taskExecutionLogs, setTaskExecutionLogs] = useState<Record<string, AITaskExecutionLog[]>>({});
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -28,6 +32,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setSelectedId(activeDoc.id);
     setFormData(activeDoc.metadata || {});
     setEntities(activeDoc.entities || []);
+    setSelectedLogTaskId(null);
+    setTaskExecutionLogs({});
   }, [activeDoc]);
 
   const handleInputChange = (field: keyof ArchiveMetadata, value: any) => {
@@ -50,6 +56,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setIsProcessing(true);
     try {
       await refreshLogs();
+      await onRefreshDocuments();
     } catch (err) {
       console.error(err);
       alert('AI Processing Failed. Check API Key.');
@@ -102,8 +109,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
               <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                 <h2 className="font-bold text-slate-800 flex items-center gap-2"><Wand2 size={18} className="text-indigo-600" /> 智能校验平台</h2>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { setShowLogModal(true); refreshLogs(); }} className="text-xs flex items-center gap-1 border border-slate-300 bg-white text-slate-700 px-3 py-1.5 rounded hover:bg-slate-50"><Info size={12} /> 查看解析日志</button>
-                  {activeDoc.status === ArchiveStatus.PROCESSING || isProcessing ? <span className="text-xs text-blue-600 flex items-center gap-1 animate-pulse"><RefreshCw size={12} className="animate-spin" /> 解析中...</span> : <button onClick={runAIAnalysis} className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded hover:bg-indigo-200">重新解析</button>}
+                  <button onClick={() => { if (activeDoc.aiTaskId) { onOpenJobDetail(activeDoc.aiTaskId); return; } setShowLogModal(true); setSelectedLogTaskId(null); refreshLogs(); }} className="text-xs flex items-center gap-1 border border-slate-300 bg-white text-slate-700 px-3 py-1.5 rounded hover:bg-slate-50"><Info size={12} /> 查看解析日志</button>
+                  {activeDoc.status === ArchiveStatus.PROCESSING || isProcessing ? <span className="text-xs text-blue-600 flex items-center gap-1 animate-pulse"><RefreshCw size={12} className="animate-spin" /> 解析中...</span> : <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded">解析完成</span>}<button onClick={runAIAnalysis} className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded hover:bg-indigo-200 disabled:opacity-50" disabled={activeDoc.status === ArchiveStatus.PROCESSING || isProcessing}>重新解析</button>
                 </div>
               </div>
 
@@ -134,7 +141,40 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
               <div className="p-4 max-h-[60vh] overflow-auto space-y-3">
                 {loadingLogs && <div className="text-sm text-slate-500">日志加载中...</div>}
                 {!loadingLogs && taskLogs.length === 0 && <div className="text-sm text-slate-500">暂无解析日志。可能处于排队初始阶段。</div>}
-                {!loadingLogs && taskLogs.map((log) => <div key={log.taskId + log.updatedAt} className="border border-slate-200 rounded-lg p-3"><div className="flex items-center justify-between text-xs"><span className="font-semibold text-slate-700">{log.taskType}</span><span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">{log.status}</span></div><p className="text-sm text-slate-700 mt-2">{log.message || '无消息'}</p><p className="text-[11px] text-slate-400 mt-1">重试次数: {log.retryCount} · 更新时间: {new Date(log.updatedAt).toLocaleString()}</p></div>)}
+                {!loadingLogs && taskLogs.map((log) => {
+                  const executionLogs = taskExecutionLogs[log.taskId] || [];
+                  const isSelected = selectedLogTaskId === log.taskId;
+                  return (
+                    <div key={log.taskId + log.updatedAt} className="border border-slate-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between text-xs"><span className="font-semibold text-slate-700">{log.taskType}</span><span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">{log.status}</span></div>
+                      <p className="text-sm text-slate-700 mt-2">{log.message || '无消息'}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">重试次数: {log.retryCount} · 更新时间: {new Date(log.updatedAt).toLocaleString()}</p>
+                      <button
+                        onClick={async () => {
+                          setSelectedLogTaskId(log.taskId);
+                          if (taskExecutionLogs[log.taskId]) return;
+                          const items = await listTaskExecutionLogs(log.taskId);
+                          setTaskExecutionLogs((prev) => ({ ...prev, [log.taskId]: items }));
+                        }}
+                        className="mt-2 text-xs text-indigo-600 hover:text-indigo-700"
+                      >
+                        查看任务详情日志
+                      </button>
+                      {isSelected && (
+                        <div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
+                          {executionLogs.length === 0 && <div className="text-xs text-slate-500">暂无任务详情日志</div>}
+                          {executionLogs.map((item) => (
+                            <div key={item.id} className="text-xs text-slate-600 bg-slate-50 rounded p-2">
+                              <div className="font-medium text-slate-700">{item.action}</div>
+                              <div>{item.detail || '-'} </div>
+                              <div className="text-[11px] text-slate-400 mt-1">{new Date(item.createdAt).toLocaleString()}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
