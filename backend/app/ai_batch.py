@@ -25,6 +25,39 @@ ALLOWED_CATEGORIES = {
     "新闻稿",
 }
 
+def _split_keywords(text: str) -> list[str]:
+    cleaned = [part.strip() for part in text.replace("\n", " ").replace("，", " ").replace(",", " ").split(" ") if part.strip()]
+    uniq: list[str] = []
+    for item in cleaned:
+        if len(item) < 2:
+            continue
+        if item not in uniq:
+            uniq.append(item)
+        if len(uniq) >= 8:
+            break
+    return uniq or ["自动解析"]
+
+
+def _bootstrap_from_existing_metadata(archive: Archive) -> dict:
+    metadata = ArchiveMetadata.query.filter_by(archive_id=archive.id).first()
+    if metadata is None or not metadata.text_content:
+        return {}
+    text = metadata.text_content[:5000]
+    return {
+        "summary": text[:180],
+        "keywords": _split_keywords(text),
+        "textContent": text,
+        "entities": [
+            {
+                "name": archive.department,
+                "type": "Organization",
+                "context": "上传部门",
+                "confidence": 0.72,
+            }
+        ],
+    }
+
+
 
 def _config_map() -> dict[str, str]:
     rows = SystemConfig.query.all()
@@ -44,16 +77,17 @@ def _build_fallback_result(archive: Archive) -> dict:
     file_name = archive.file_name
     now = datetime.utcnow().strftime("%Y-%m-%d")
     base_name = file_name.rsplit(".", 1)[0]
+    bootstrap = _bootstrap_from_existing_metadata(archive)
     return {
         "title": base_name,
         "category": "行政档案",
         "date": now,
         "authors": [archive.department],
-        "summary": f"根据文件名《{file_name}》生成的自动解析结果（未调用外部 AI）。",
-        "keywords": ["自动解析", "待人工复核", archive.department],
-        "confidenceScore": 60,
-        "textContent": f"文件名：{file_name}；路径：{archive.folder_path or '未设置'}。",
-        "entities": [
+        "summary": bootstrap.get("summary") or f"根据文件名《{file_name}》生成的自动解析结果（未调用外部 AI）。",
+        "keywords": bootstrap.get("keywords") or ["自动解析", "待人工复核", archive.department],
+        "confidenceScore": 60 if not bootstrap else 72,
+        "textContent": bootstrap.get("textContent") or f"文件名：{file_name}；路径：{archive.folder_path or '未设置'}。",
+        "entities": bootstrap.get("entities") or [
             {
                 "name": archive.department,
                 "type": "Organization",
@@ -89,11 +123,13 @@ def _call_ai(archive: Archive) -> dict:
     if not base_url or not api_key:
         return _build_fallback_result(archive)
 
+    existing_metadata = ArchiveMetadata.query.filter_by(archive_id=archive.id).first()
     archive_brief = {
         "fileName": archive.file_name,
         "fileType": archive.file_type,
         "department": archive.department,
         "path": archive.folder_path or "",
+        "preExtractedText": (existing_metadata.text_content[:3000] if existing_metadata and existing_metadata.text_content else ""),
     }
     user_prompt = (
         "请解析以下档案并返回 JSON："
