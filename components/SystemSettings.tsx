@@ -49,6 +49,10 @@ const parseJsonSetting = <T,>(value: string | undefined, fallback: T): T => {
   }
 };
 
+
+const DEFAULT_SYSTEM_PROMPT = '你是高校档案解析助手。请根据文件名和基础信息推断档案内容，并返回结构化 JSON。';
+const DEFAULT_USER_PROMPT_TEMPLATE = '请解析以下档案并返回 JSON：{{archiveBrief}}。category 字段必须且只能使用下列档案目录分类之一：{{allowedCategories}}。JSON 字段必须包含：title, category, date, authors, summary, keywords, confidenceScore, textContent, entities。';
+
 const SystemSettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(true);
@@ -77,6 +81,9 @@ const SystemSettings: React.FC = () => {
   const [deepseekModel, setDeepseekModel] = useState(DEFAULT_LLM_MODELS.deepseek);
   const [openaiModel, setOpenaiModel] = useState(DEFAULT_LLM_MODELS.openai);
   const [localModel, setLocalModel] = useState(DEFAULT_LLM_MODELS.local);
+  const [llmEnabled, setLlmEnabled] = useState(true);
+  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
+  const [userPromptTemplate, setUserPromptTemplate] = useState(DEFAULT_USER_PROMPT_TEMPLATE);
   const [testMessage, setTestMessage] = useState('');
   const [testDetail, setTestDetail] = useState('');
   const [testing, setTesting] = useState(false);
@@ -107,6 +114,9 @@ const SystemSettings: React.FC = () => {
         setDeepseekModel(map.get('llm.deepseek_model') || DEFAULT_LLM_MODELS.deepseek);
         setOpenaiModel(map.get('llm.openai_model') || DEFAULT_LLM_MODELS.openai);
         setLocalModel(map.get('llm.local_model') || DEFAULT_LLM_MODELS.local);
+        setLlmEnabled((map.get('llm.enabled') || 'true').toLowerCase() !== 'false');
+        setSystemPrompt(map.get('llm.system_prompt') || DEFAULT_SYSTEM_PROMPT);
+        setUserPromptTemplate(map.get('llm.user_prompt_template') || DEFAULT_USER_PROMPT_TEMPLATE);
       })
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : '设置加载失败'))
       .finally(() => setLoading(false));
@@ -184,10 +194,13 @@ const SystemSettings: React.FC = () => {
 
       const selected = providerSettings[llmProvider];
       await Promise.all([
+        updateSetting('llm.enabled', llmEnabled ? 'true' : 'false', '是否启用 AI 调用（false 时仅生成兜底结果）'),
         updateSetting('llm.provider', llmProvider, '文档抽取大模型提供商'),
         updateSetting(selected.urlKey, selected.urlValue, `${selected.providerName} API 基础地址`),
         updateSetting(selected.tokenKey, selected.tokenValue, `${selected.providerName} API Token/API Key`),
         updateSetting(selected.modelKey, selected.modelValue, `${selected.providerName} 默认模型`),
+        updateSetting('llm.system_prompt', systemPrompt, '档案解析 System Prompt'),
+        updateSetting('llm.user_prompt_template', userPromptTemplate, '档案解析 User Prompt 模板（支持 {{archiveBrief}}、{{allowedCategories}} 占位符）'),
       ]);
       alert('大模型接口配置已保存');
     } catch (error) {
@@ -286,6 +299,22 @@ const SystemSettings: React.FC = () => {
               <input className="w-full border border-slate-300 rounded-lg p-2 text-sm" value={activeProviderModel} onChange={(e) => {
                 if (llmProvider === 'qwen') setQwenModel(e.target.value); else if (llmProvider === 'glm') setGlmModel(e.target.value); else if (llmProvider === 'deepseek') setDeepseekModel(e.target.value); else if (llmProvider === 'openai') setOpenaiModel(e.target.value); else if (llmProvider === 'local') setLocalModel(e.target.value); else setKimiModel(e.target.value);
               }} placeholder="模型名称（例如 gpt-4o-mini）" />
+
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={llmEnabled} onChange={(e) => setLlmEnabled(e.target.checked)} />
+                启用 AI 接口调用（关闭后任务将跳过远程调用并使用兜底解析）
+              </label>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">System Prompt</label>
+                <textarea className="w-full border border-slate-300 rounded-lg p-2 text-sm min-h-[88px]" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">User Prompt 模板</label>
+                <textarea className="w-full border border-slate-300 rounded-lg p-2 text-sm min-h-[120px]" value={userPromptTemplate} onChange={(e) => setUserPromptTemplate(e.target.value)} />
+                <p className="text-xs text-slate-500 mt-1">{'支持占位符：{{archiveBrief}}、{{allowedCategories}}。'}</p>
+              </div>
 
               <div className="flex gap-2">
                 <button onClick={saveLlm} disabled={saving} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"><Save size={14} /> 保存大模型配置</button>
