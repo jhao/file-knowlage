@@ -14,6 +14,12 @@ SYSTEM_PROMPT = (
     "并返回结构化 JSON。"
 )
 
+DEFAULT_USER_PROMPT_TEMPLATE = (
+    "请解析以下档案并返回 JSON：{{archiveBrief}}。"
+    "category 字段必须且只能使用下列档案目录分类之一：{{allowedCategories}}。"
+    "JSON 字段必须包含：title, category, date, authors, summary, keywords, confidenceScore, textContent, entities。"
+)
+
 
 DEFAULT_PROVIDER_MODELS = {
     "kimi": "moonshot-v1-8k",
@@ -126,6 +132,19 @@ def _provider_config() -> tuple[str, str, str, str]:
     return provider, base_url, api_key, model
 
 
+def _ai_enabled(cfg: dict[str, str] | None = None) -> bool:
+    values = cfg or _config_map()
+    raw = (values.get("llm.enabled") or "true").strip().lower()
+    return raw in {"1", "true", "yes", "on", "enabled"}
+
+
+def _render_prompt_template(template: str, context: dict[str, str]) -> str:
+    rendered = template
+    for key, value in context.items():
+        rendered = rendered.replace(f"{{{{{key}}}}}", value)
+    return rendered
+
+
 def _build_fallback_result(archive: Archive) -> dict:
     file_name = archive.file_name
     now = datetime.utcnow().strftime("%Y-%m-%d")
@@ -194,10 +213,17 @@ def _build_curl_command(url: str, api_key: str, payload: dict) -> str:
 
 
 def _call_ai(archive: Archive, task_id: str) -> dict:
+    cfg = _config_map()
     provider, base_url, api_key, model = _provider_config()
     allowed_categories = _load_allowed_categories()
-    if not base_url or not api_key:
+
+    if not _ai_enabled(cfg):
+        log_ai_api_call("AI_PARSE_SKIPPED", "系统设置 llm.enabled=false，跳过 AI 调用", task_id)
         return _build_fallback_result(archive)
+
+    if not base_url or not api_key:
+        log_ai_api_call("AI_PARSE_CONFIG_INVALID", "AI 已启用但缺少 URL 或 API Token 配置", task_id)
+        raise ValueError("未配置可用的 AI URL 或 API Token")
 
     existing_metadata = ArchiveMetadata.query.filter_by(archive_id=archive.id).first()
     archive_brief = {
@@ -207,18 +233,21 @@ def _call_ai(archive: Archive, task_id: str) -> dict:
         "path": archive.folder_path or "",
         "preExtractedText": (existing_metadata.text_content[:3000] if existing_metadata and existing_metadata.text_content else ""),
     }
-    user_prompt = (
-        "请解析以下档案并返回 JSON："
-        f"{json.dumps(archive_brief, ensure_ascii=False)}。"
-        f"category 字段必须且只能使用下列档案目录分类之一：{json.dumps(allowed_categories, ensure_ascii=False)}。"
-        "JSON 字段必须包含：title, category, date, authors, summary, keywords, confidenceScore, textContent, entities。"
+    system_prompt = (cfg.get("llm.system_prompt") or SYSTEM_PROMPT).strip() or SYSTEM_PROMPT
+    user_prompt_template = (cfg.get("llm.user_prompt_template") or DEFAULT_USER_PROMPT_TEMPLATE).strip() or DEFAULT_USER_PROMPT_TEMPLATE
+    user_prompt = _render_prompt_template(
+        user_prompt_template,
+        {
+            "archiveBrief": json.dumps(archive_brief, ensure_ascii=False),
+            "allowedCategories": json.dumps(allowed_categories, ensure_ascii=False),
+        },
     )
     payload = {
         "model": model,
         "temperature": 0.2,
         "response_format": {"type": "json_object"},
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
     }
@@ -254,13 +283,13 @@ def _call_ai(archive: Archive, task_id: str) -> dict:
             }
             log_ai_api_call("AI_PARSE_RESPONSE", json.dumps(response_detail, ensure_ascii=False), task_id)
             return _normalize_result(parsed, archive, allowed_categories)
-    except (error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError) as exc:
+    except (error.HTTPError, error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError) as exc:
         failure_detail = {
             **request_detail,
             "error": str(exc),
         }
         log_ai_api_call("AI_PARSE_RESPONSE_FAILED", json.dumps(failure_detail, ensure_ascii=False), task_id)
-        return _build_fallback_result(archive)
+        raise RuntimeError(f"AI API 调用失败：{str(exc)[:180]}") from exc
 
 
 def _save_parse_result(task: AITask, archive: Archive, result: dict) -> None:
@@ -328,7 +357,8 @@ def process_pending_tasks(batch_size: int = 2) -> int:
         except Exception as exc:
             task.status = "FAILED"
             task.retry_count = task.retry_count + 1
-            task.result_message = f"解析失败：{str(exc)[:180]}"
+            task.result_message = f"AI处理失败：{str(exc)[:180]}"
+            archive.status = "等待人工校验"
             log_ai_api_call("AI_PARSE_FAILED", f"任务 {task.task_id} 失败：{exc}", task.task_id)
 
         db.session.commit()
