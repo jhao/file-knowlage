@@ -36,10 +36,10 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
   return payload as T;
 };
 
-export const login = async (username: string, password: string): Promise<LoginResponse> =>
+export const login = async (username: string, passwordDigest: string): Promise<LoginResponse> =>
   request<LoginResponse>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, passwordDigest }),
   });
 
 export const getCurrentUser = async (token: string): Promise<AuthUser> => {

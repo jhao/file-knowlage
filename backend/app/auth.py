@@ -127,13 +127,20 @@ def require_permission(permission_key: str):
 def login():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
+    password_digest = (data.get("passwordDigest") or "").strip()
     password = (data.get("password") or "").strip()
 
-    if not username or not password:
+    if not username or (not password_digest and not password):
         return jsonify({"message": "用户名和密码不能为空"}), 400
 
     user = User.query.filter_by(username=username).first()
-    if user is None or not user.check_password(password):
+    password_valid = False
+    if user is not None:
+        if password_digest:
+            password_valid = user.check_password(password_digest)
+        if not password_valid and password:
+            password_valid = user.check_password(password)
+    if user is None or not password_valid:
         return jsonify({"message": "用户名或密码错误"}), 401
 
     token = _generate_token(user)

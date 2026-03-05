@@ -7,6 +7,7 @@ from flask_cors import CORS
 from .archives import bp as archives_bp
 from .auth import bp as auth_bp
 from .extensions import db
+from .integrations import bp as integrations_bp
 from .logs import bp as logs_bp
 from .models import OperationLog
 from .reviews import bp as reviews_bp
@@ -46,6 +47,7 @@ def create_app() -> Flask:
     app.register_blueprint(stats_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(logs_bp)
+    app.register_blueprint(integrations_bp)
 
     @app.before_request
     def _start_timer():
