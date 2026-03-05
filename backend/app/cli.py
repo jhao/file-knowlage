@@ -1,4 +1,5 @@
 import click
+import hashlib
 from flask import Flask
 
 from .ai_batch import process_pending_tasks, worker_loop
@@ -22,7 +23,7 @@ def seed_command() -> None:
             role="管理员",
             department="档案馆",
         )
-        admin.set_password("admin123")
+        admin.set_password(hashlib.sha256("admin123".encode("utf-8")).hexdigest())
         db.session.add(admin)
 
     demo = User.query.filter_by(username="user").first()
@@ -33,7 +34,7 @@ def seed_command() -> None:
             role="普通用户",
             department="教务处",
         )
-        demo.set_password("user123")
+        demo.set_password(hashlib.sha256("user123".encode("utf-8")).hexdigest())
         db.session.add(demo)
 
     db.session.flush()

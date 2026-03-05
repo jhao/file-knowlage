@@ -21,3 +21,32 @@ export const listUsers = async (): Promise<User[]> => {
   const result = await apiRequest<{ items: AuthUser[] }>('/api/users');
   return result.items.map(toUser);
 };
+
+interface SaveUserPayload {
+  username?: string;
+  displayName: string;
+  role: UserRole;
+  department: string;
+  isActive?: boolean;
+  passwordDigest?: string;
+}
+
+export const createUser = async (payload: SaveUserPayload): Promise<User> => {
+  const result = await apiRequest<{ item: AuthUser }>('/api/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return toUser(result.item);
+};
+
+export const updateUser = async (userId: string, payload: SaveUserPayload): Promise<User> => {
+  const result = await apiRequest<{ item: AuthUser }>(`/api/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return toUser(result.item);
+};
+
+export const deleteUser = async (userId: string): Promise<void> => {
+  await apiRequest(`/api/users/${userId}`, { method: 'DELETE' });
+};

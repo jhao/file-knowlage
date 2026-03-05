@@ -14,6 +14,7 @@ import SystemLogsView from './components/SystemLogsView';
 import BackendJobsView from './components/BackendJobsView';
 import { login as loginApi, getCurrentUser, type AuthUser } from './services/authApi';
 import { approveArchive, createUpload, listArchives, rejectArchive, updateArchive } from './services/archiveApi';
+import { sha256Hex } from './services/crypto';
 import { getDashboardStats, type DashboardStatsResponse } from './services/statsApi';
 import { ArchiveDocument, ArchiveStatus, UserRole } from './types';
 
@@ -68,7 +69,8 @@ const App: React.FC = () => {
     setIsLoginSubmitting(true);
     setLoginError('');
     try {
-      const result = await loginApi(username, password);
+      const passwordDigest = await sha256Hex(password);
+      const result = await loginApi(username, passwordDigest);
       localStorage.setItem('auth_token', result.accessToken);
       setAuthUser(result.user);
       setUserRole(result.user.role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.USER);
