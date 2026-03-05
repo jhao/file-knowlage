@@ -9,6 +9,52 @@ interface BackendJobsViewProps {
 const primaryBtn = 'bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60';
 const subtleBtn = 'text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-sm font-medium';
 
+const formatExecutionLogDetail = (log: AITaskExecutionLog): React.ReactNode => {
+  if (!log.detail) return '-';
+
+  try {
+    const parsed = JSON.parse(log.detail);
+    const requestPayload = parsed?.requestPayload ? JSON.stringify(parsed.requestPayload, null, 2) : null;
+    const responseContent = parsed?.responseContent ? JSON.stringify(parsed.responseContent, null, 2) : null;
+    const responseBody = parsed?.responseBody ? JSON.stringify(parsed.responseBody, null, 2) : null;
+
+    return (
+      <div className="space-y-2 text-xs">
+        {parsed.endpoint && <div><span className="font-semibold text-slate-700">API:</span> {parsed.endpoint}</div>}
+        {parsed.model && <div><span className="font-semibold text-slate-700">Model:</span> {parsed.model}</div>}
+        {parsed.curl && (
+          <div>
+            <div className="font-semibold text-slate-700 mb-1">cURL</div>
+            <pre className="bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap break-all">{parsed.curl}</pre>
+          </div>
+        )}
+        {requestPayload && (
+          <div>
+            <div className="font-semibold text-slate-700 mb-1">请求参数</div>
+            <pre className="bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap break-all">{requestPayload}</pre>
+          </div>
+        )}
+        {responseContent && (
+          <div>
+            <div className="font-semibold text-slate-700 mb-1">响应结果（解析后）</div>
+            <pre className="bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap break-all">{responseContent}</pre>
+          </div>
+        )}
+        {!responseContent && responseBody && (
+          <div>
+            <div className="font-semibold text-slate-700 mb-1">响应结果（原始）</div>
+            <pre className="bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap break-all">{responseBody}</pre>
+          </div>
+        )}
+        {parsed.error && <div><span className="font-semibold text-rose-700">错误:</span> {String(parsed.error)}</div>}
+      </div>
+    );
+  } catch {
+    return <span>{log.detail}</span>;
+  }
+};
+
+
 const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
   const [items, setItems] = useState<AITaskLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -127,7 +173,7 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
                 <div key={log.id} className="border border-slate-200 rounded-lg p-3">
                   <div className="text-xs text-slate-500">{new Date(log.createdAt).toLocaleString()} · {log.type}</div>
                   <div className="text-sm font-semibold text-slate-700 mt-1">{log.action}</div>
-                  <div className="text-sm text-slate-600 mt-1">{log.detail || '-'}</div>
+                  <div className="text-sm text-slate-600 mt-1">{formatExecutionLogDetail(log)}</div>
                 </div>
               ))}
             </div>
