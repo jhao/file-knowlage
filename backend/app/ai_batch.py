@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import time
 from datetime import datetime
 from urllib import error, request
@@ -174,7 +175,25 @@ def _normalize_result(raw: dict, archive: Archive, allowed_categories: list[str]
     }
 
 
-def _call_ai(archive: Archive) -> dict:
+def _build_curl_command(url: str, api_key: str, payload: dict) -> str:
+    payload_text = json.dumps(payload, ensure_ascii=False)
+    return " ".join(
+        [
+            "curl",
+            "-X",
+            "POST",
+            shlex.quote(url),
+            "-H",
+            shlex.quote("Content-Type: application/json"),
+            "-H",
+            shlex.quote(f"Authorization: Bearer {api_key}"),
+            "--data-raw",
+            shlex.quote(payload_text),
+        ]
+    )
+
+
+def _call_ai(archive: Archive, task_id: str) -> dict:
     provider, base_url, api_key, model = _provider_config()
     allowed_categories = _load_allowed_categories()
     if not base_url or not api_key:
@@ -203,8 +222,19 @@ def _call_ai(archive: Archive) -> dict:
             {"role": "user", "content": user_prompt},
         ],
     }
+    endpoint = f"{base_url.rstrip('/')}/chat/completions"
+    curl_command = _build_curl_command(endpoint, api_key, payload)
+    request_detail = {
+        "provider": provider,
+        "model": model,
+        "endpoint": endpoint,
+        "requestPayload": payload,
+        "curl": curl_command,
+    }
+    log_ai_api_call("AI_PARSE_REQUEST", json.dumps(request_detail, ensure_ascii=False), task_id)
+
     req = request.Request(
-        url=f"{base_url.rstrip('/')}/chat/completions",
+        url=endpoint,
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
@@ -217,8 +247,19 @@ def _call_ai(archive: Archive) -> dict:
             body = json.loads(resp.read().decode("utf-8"))
             content = body["choices"][0]["message"]["content"]
             parsed = json.loads(content)
+            response_detail = {
+                **request_detail,
+                "responseBody": body,
+                "responseContent": parsed,
+            }
+            log_ai_api_call("AI_PARSE_RESPONSE", json.dumps(response_detail, ensure_ascii=False), task_id)
             return _normalize_result(parsed, archive, allowed_categories)
-    except (error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError):
+    except (error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError) as exc:
+        failure_detail = {
+            **request_detail,
+            "error": str(exc),
+        }
+        log_ai_api_call("AI_PARSE_RESPONSE_FAILED", json.dumps(failure_detail, ensure_ascii=False), task_id)
         return _build_fallback_result(archive)
 
 
@@ -281,7 +322,7 @@ def process_pending_tasks(batch_size: int = 2) -> int:
         db.session.commit()
 
         try:
-            ai_result = _call_ai(archive)
+            ai_result = _call_ai(archive, task.task_id)
             _save_parse_result(task, archive, ai_result)
             log_ai_api_call("AI_PARSE_SUCCESS", f"任务 {task.task_id} 解析完成", task.task_id)
         except Exception as exc:
