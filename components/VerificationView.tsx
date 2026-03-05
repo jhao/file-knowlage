@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, ArchiveCategory, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
+import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
 import { Check, RefreshCw, Eye, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert, X } from 'lucide-react';
 import FilePreview from './FilePreview';
+import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
 
 interface VerificationViewProps {
   documents: ArchiveDocument[];
@@ -35,6 +36,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [entities, setEntities] = useState<KnowledgeEntity[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [relationKeyword, setRelationKeyword] = useState('');
+  const [categoryTree, setCategoryTree] = useState<ArchiveCategoryNode[]>([]);
+  const [categoryPath, setCategoryPath] = useState<string[]>([]);
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -45,7 +48,25 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setEntities(activeDoc.entities || []);
   }, [activeDoc]);
 
+  useEffect(() => {
+    loadArchiveCategoryTree()
+      .then((tree) => {
+        setCategoryTree(tree);
+        setCategoryPath(findCategoryPath(tree, activeDoc?.metadata?.category || ''));
+      })
+      .catch(() => {
+        setCategoryTree([]);
+        setCategoryPath([]);
+      });
+  }, [activeDoc?.metadata?.category]);
+
   const handleInputChange = (field: keyof ArchiveMetadata, value: any) => setFormData((prev) => ({ ...prev, [field]: value }));
+  const categoryLevels = buildCategoryLevels(categoryTree, categoryPath);
+  const handleCategoryLevelChange = (level: number, value: string) => {
+    const nextPath = [...categoryPath.slice(0, level), value].filter(Boolean);
+    setCategoryPath(nextPath);
+    handleInputChange('category', value || '未分类');
+  };
   const handleConfirm = () => activeDoc && onUpdateDocument(activeDoc.id, { status: ArchiveStatus.APPROVED, metadata: formData as ArchiveMetadata, entities });
   const handleReject = () => activeDoc && onUpdateDocument(activeDoc.id, { status: ArchiveStatus.REJECTED });
 
@@ -100,7 +121,30 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
                     <div><label className="block text-xs text-slate-500 mb-1">文档标题</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.title || ''} onChange={(e) => handleInputChange('title', e.target.value)} /></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><label className="block text-xs text-slate-500 mb-1">日期</label><input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.date || ''} onChange={(e) => handleInputChange('date', e.target.value)} /></div>
-                      <div><label className="block text-xs text-slate-500 mb-1">分类</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.category || ArchiveCategory.UNKNOWN} onChange={(e) => handleInputChange('category', e.target.value)}>{Object.values(ArchiveCategory).map((cat) => <option key={cat} value={cat}>{cat}</option>)}</select></div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">分类</label>
+                        <div className="space-y-2">
+                          {categoryLevels.map((options, level) => (
+                            <select
+                              key={`category-level-${level}`}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                              value={categoryPath[level] || ''}
+                              onChange={(e) => handleCategoryLevelChange(level, e.target.value)}
+                            >
+                              <option value="">请选择第 {level + 1} 级分类</option>
+                              {options.map((item) => <option key={`${level}-${item}`} value={item}>{item}</option>)}
+                            </select>
+                          ))}
+                          {categoryLevels.length === 0 && (
+                            <input
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                              value={formData.category || ''}
+                              onChange={(e) => handleInputChange('category', e.target.value)}
+                              placeholder="请输入分类"
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div><label className="block text-xs text-slate-500 mb-1">归属部门</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.department || ''} onChange={(e) => handleInputChange('department', e.target.value)} /></div>
                     <div><label className="block text-xs text-slate-500 mb-1">密级</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.securityLevel || SecurityLevel.INTERNAL} onChange={(e) => handleInputChange('securityLevel', e.target.value)} disabled={currentUserRole !== UserRole.ADMIN}>{Object.values(SecurityLevel).map((l) => <option key={l} value={l}>{l}</option>)}</select></div>

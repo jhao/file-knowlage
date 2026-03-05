@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ArchiveDocument, ArchiveMetadata, ArchiveCategory, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
+import { ArchiveDocument, ArchiveMetadata, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
 import { ArrowLeft, RefreshCw, Wand2, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert } from 'lucide-react';
 import FilePreview from './FilePreview';
+import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
 
 interface FileDetailViewProps {
   document: ArchiveDocument;
@@ -23,13 +24,34 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
   const [formData, setFormData] = useState<Partial<ArchiveMetadata>>({});
   const [entities, setEntities] = useState<KnowledgeEntity[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [categoryTree, setCategoryTree] = useState<ArchiveCategoryNode[]>([]);
+  const [categoryPath, setCategoryPath] = useState<string[]>([]);
 
   useEffect(() => {
     setFormData(document.metadata || {});
     setEntities(document.entities || []);
   }, [document]);
 
+  useEffect(() => {
+    loadArchiveCategoryTree()
+      .then((tree) => {
+        setCategoryTree(tree);
+        setCategoryPath(findCategoryPath(tree, document.metadata?.category || ''));
+      })
+      .catch(() => {
+        setCategoryTree([]);
+        setCategoryPath([]);
+      });
+  }, [document.metadata?.category]);
+
   const handleInputChange = (field: keyof ArchiveMetadata, value: any) => setFormData((prev) => ({ ...prev, [field]: value }));
+  const categoryLevels = buildCategoryLevels(categoryTree, categoryPath);
+
+  const handleCategoryLevelChange = (level: number, value: string) => {
+    const nextPath = [...categoryPath.slice(0, level), value].filter(Boolean);
+    setCategoryPath(nextPath);
+    handleInputChange('category', value || '未分类');
+  };
 
   const runAIAnalysis = async () => {
     setIsProcessing(true);
@@ -81,7 +103,30 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
                 <div><label className="block text-xs text-slate-500 mb-1">文档标题</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.title || ''} onChange={(e) => handleInputChange('title', e.target.value)} /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="block text-xs text-slate-500 mb-1">日期</label><input type="date" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.date || ''} onChange={(e) => handleInputChange('date', e.target.value)} /></div>
-                  <div><label className="block text-xs text-slate-500 mb-1">分类</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.category || ArchiveCategory.UNKNOWN} onChange={(e) => handleInputChange('category', e.target.value)}>{Object.values(ArchiveCategory).map((cat) => <option key={cat} value={cat}>{cat}</option>)}</select></div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">分类</label>
+                    <div className="space-y-2">
+                      {categoryLevels.map((options, level) => (
+                        <select
+                          key={`category-level-${level}`}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          value={categoryPath[level] || ''}
+                          onChange={(e) => handleCategoryLevelChange(level, e.target.value)}
+                        >
+                          <option value="">请选择第 {level + 1} 级分类</option>
+                          {options.map((item) => <option key={`${level}-${item}`} value={item}>{item}</option>)}
+                        </select>
+                      ))}
+                      {categoryLevels.length === 0 && (
+                        <input
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          value={formData.category || ''}
+                          onChange={(e) => handleInputChange('category', e.target.value)}
+                          placeholder="请输入分类"
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div><label className="block text-xs text-slate-500 mb-1">归属部门</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.department || ''} onChange={(e) => handleInputChange('department', e.target.value)} /></div>
                 <div><label className="block text-xs text-slate-500 mb-1">责任者</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={formData.authors?.join(', ') || ''} onChange={(e) => handleInputChange('authors', e.target.value.split(',').map((v) => v.trim()).filter(Boolean))} /></div>

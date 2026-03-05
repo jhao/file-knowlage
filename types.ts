@@ -42,7 +42,7 @@ export interface KnowledgeEntity {
 
 export interface ArchiveMetadata {
   title: string;
-  category: ArchiveCategory;
+  category: string;
   date: string; // ISO string
   authors: string[];
   department: string;

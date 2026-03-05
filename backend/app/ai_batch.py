@@ -23,7 +23,7 @@ DEFAULT_PROVIDER_MODELS = {
     "local": "llama3.1:8b",
 }
 
-ALLOWED_CATEGORIES = {
+DEFAULT_ALLOWED_CATEGORIES = [
     "学籍档案",
     "人事档案",
     "科研档案",
@@ -33,7 +33,49 @@ ALLOWED_CATEGORIES = {
     "手稿",
     "教材",
     "新闻稿",
-}
+]
+
+
+def _walk_category_labels(node: object) -> list[str]:
+    labels: list[str] = []
+    if isinstance(node, str):
+        text = node.strip()
+        if text:
+            labels.append(text)
+        return labels
+
+    if isinstance(node, dict):
+        name = str(node.get("name") or "").strip()
+        if name:
+            labels.append(name)
+        children = node.get("children")
+        if isinstance(children, list):
+            for child in children:
+                labels.extend(_walk_category_labels(child))
+        return labels
+
+    if isinstance(node, list):
+        for item in node:
+            labels.extend(_walk_category_labels(item))
+    return labels
+
+
+def _load_allowed_categories() -> list[str]:
+    cfg = _config_map()
+    raw_tree = cfg.get("archive_category_tree")
+    if not raw_tree:
+        return DEFAULT_ALLOWED_CATEGORIES
+    try:
+        parsed = json.loads(raw_tree)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return DEFAULT_ALLOWED_CATEGORIES
+
+    categories = _walk_category_labels(parsed)
+    uniq: list[str] = []
+    for item in categories:
+        if item not in uniq:
+            uniq.append(item)
+    return uniq or DEFAULT_ALLOWED_CATEGORIES
 
 def _split_keywords(text: str) -> list[str]:
     cleaned = [part.strip() for part in text.replace("\n", " ").replace("，", " ").replace(",", " ").split(" ") if part.strip()]
@@ -88,9 +130,11 @@ def _build_fallback_result(archive: Archive) -> dict:
     now = datetime.utcnow().strftime("%Y-%m-%d")
     base_name = file_name.rsplit(".", 1)[0]
     bootstrap = _bootstrap_from_existing_metadata(archive)
+    allowed_categories = _load_allowed_categories()
+    fallback_category = allowed_categories[0] if allowed_categories else "行政档案"
     return {
         "title": base_name,
-        "category": "行政档案",
+        "category": fallback_category,
         "date": now,
         "authors": [archive.department],
         "summary": bootstrap.get("summary") or f"根据文件名《{file_name}》生成的自动解析结果（未调用外部 AI）。",
@@ -108,10 +152,12 @@ def _build_fallback_result(archive: Archive) -> dict:
     }
 
 
-def _normalize_result(raw: dict, archive: Archive) -> dict:
+def _normalize_result(raw: dict, archive: Archive, allowed_categories: list[str] | None = None) -> dict:
+    valid_categories = allowed_categories or _load_allowed_categories()
+    fallback_category = valid_categories[0] if valid_categories else "行政档案"
     category = raw.get("category") if isinstance(raw.get("category"), str) else "行政档案"
-    if category not in ALLOWED_CATEGORIES:
-        category = "行政档案"
+    if category not in valid_categories:
+        category = fallback_category
 
     entities = raw.get("entities") if isinstance(raw.get("entities"), list) else []
 
@@ -130,6 +176,7 @@ def _normalize_result(raw: dict, archive: Archive) -> dict:
 
 def _call_ai(archive: Archive) -> dict:
     provider, base_url, api_key, model = _provider_config()
+    allowed_categories = _load_allowed_categories()
     if not base_url or not api_key:
         return _build_fallback_result(archive)
 
@@ -144,6 +191,7 @@ def _call_ai(archive: Archive) -> dict:
     user_prompt = (
         "请解析以下档案并返回 JSON："
         f"{json.dumps(archive_brief, ensure_ascii=False)}。"
+        f"category 字段必须且只能使用下列档案目录分类之一：{json.dumps(allowed_categories, ensure_ascii=False)}。"
         "JSON 字段必须包含：title, category, date, authors, summary, keywords, confidenceScore, textContent, entities。"
     )
     payload = {
@@ -169,7 +217,7 @@ def _call_ai(archive: Archive) -> dict:
             body = json.loads(resp.read().decode("utf-8"))
             content = body["choices"][0]["message"]["content"]
             parsed = json.loads(content)
-            return _normalize_result(parsed, archive)
+            return _normalize_result(parsed, archive, allowed_categories)
     except (error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError):
         return _build_fallback_result(archive)
 
