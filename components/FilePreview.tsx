@@ -404,7 +404,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ archiveId, fileName, fileType
             {!loading && error && <div className="text-red-700 text-sm bg-red-50 p-4">Office 预览失败：{error}</div>}
 
             {!loading && !error && isDocx && docxHtml && (
-              <DragScrollable className="w-full h-full overflow-auto p-4">
+              <DragScrollable className="w-full h-full overflow-auto p-4 relative">
+                <style>{`.docx-wrapper { position: absolute !important; }`}</style>
                 <div className="min-w-max min-h-max" dangerouslySetInnerHTML={{ __html: docxHtml }} />
               </DragScrollable>
             )}

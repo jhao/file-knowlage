@@ -80,7 +80,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
             <div className="flex-1 bg-slate-900 flex items-center justify-center"><FilePreview archiveId={activeDoc.id} fileName={activeDoc.fileName} fileType={activeDoc.fileType} contentBase64={activeDoc.contentBase64} textContent={formData.textContent} /></div>
           </div>
 
-          <div className="w-[520px] bg-white flex flex-col">
+          <div className="w-[520px] bg-white flex flex-col relative min-h-0">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
               <h3 className="font-semibold text-slate-800">AI智能审查</h3>
               <button onClick={runAIAnalysis} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2" disabled={isProcessing}>{isProcessing ? <><RefreshCw size={14} className="animate-spin" />刷新中</> : '刷新结果'}</button>
@@ -92,7 +92,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
               <button onClick={() => setActiveTab('content')} className={`flex-1 py-3 text-sm font-medium ${activeTab === 'content' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500'}`}><FileText size={14} className="inline mr-1" />全文解析</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
               {activeTab === 'metadata' && (
                 <>
                   <section className="rounded-lg border border-slate-200 p-4 space-y-3">
