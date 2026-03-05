@@ -92,7 +92,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
               <button onClick={() => setActiveTab('content')} className={`flex-1 py-3 text-sm font-medium ${activeTab === 'content' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500'}`}><FileText size={14} className="inline mr-1" />全文解析</button>
             </div>
 
-            <div className="absolute inset-x-0 top-[97px] bottom-[73px] overflow-y-auto p-5 space-y-4">
+            <div className="inset-x-0 top-[97px] bottom-[73px] overflow-y-auto p-5 space-y-4">
               {activeTab === 'metadata' && (
                 <>
                   <section className="rounded-lg border border-slate-200 p-4 space-y-3">
