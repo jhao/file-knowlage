@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArchiveDocument, ArchiveMetadata, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
 import { ArrowLeft, RefreshCw, Wand2, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert } from 'lucide-react';
 import FilePreview from './FilePreview';
 import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
+import { listSettings } from '../services/settingsApi';
 
 interface FileDetailViewProps {
   document: ArchiveDocument;
@@ -11,13 +12,6 @@ interface FileDetailViewProps {
   currentUserRole: UserRole;
 }
 
-const ENTITY_TYPES = [
-  { value: 'Person', label: 'Person（人物）' },
-  { value: 'Location', label: 'Location（地点）' },
-  { value: 'Organization', label: 'Organization（组织）' },
-  { value: 'Event', label: 'Event（事件）' },
-  { value: 'Concept', label: 'Concept（概念）' },
-] as const;
 
 const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpdateDocument, currentUserRole }) => {
   const [activeTab, setActiveTab] = useState<'metadata' | 'entities' | 'content'>('metadata');
@@ -26,6 +20,8 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
   const [isProcessing, setIsProcessing] = useState(false);
   const [categoryTree, setCategoryTree] = useState<ArchiveCategoryNode[]>([]);
   const [categoryPath, setCategoryPath] = useState<string[]>([]);
+  const [entityTypeItems, setEntityTypeItems] = useState<Array<{ key: string; label: string }>>([]);
+  const [relationKeywords, setRelationKeywords] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setFormData(document.metadata || {});
@@ -43,6 +39,21 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
         setCategoryPath([]);
       });
   }, [document.metadata?.category]);
+
+
+  useEffect(() => {
+    listSettings()
+      .then((items) => {
+        const map = new Map(items.map((item) => [item.key, item.value]));
+        const raw = map.get('entity_types_json');
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Array<{ key: string; label: string }>;
+        if (Array.isArray(parsed) && parsed.length > 0) setEntityTypeItems(parsed);
+      })
+      .catch(() => setEntityTypeItems([]));
+  }, []);
+
+  const availableEntities = useMemo(() => entities.filter((item) => item.name.trim()), [entities]);
 
   const handleInputChange = (field: keyof ArchiveMetadata, value: any) => setFormData((prev) => ({ ...prev, [field]: value }));
   const categoryLevels = buildCategoryLevels(categoryTree, categoryPath);
@@ -66,7 +77,7 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
     alert('保存成功！');
   };
 
-  const addEntity = () => setEntities((prev) => [...prev, { id: Date.now().toString(), name: '', type: 'Concept', parentType: 'Concept', context: '', confidence: 100 }]);
+  const addEntity = () => setEntities((prev) => [...prev, { id: Date.now().toString(), name: '', type: '', parentType: '', relatedEntityIds: [], context: '', confidence: 100 }]);
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-100">
@@ -154,11 +165,64 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
                     <h5 className="text-sm font-medium text-slate-700">实体 {idx + 1}</h5>
                     <button onClick={() => setEntities((prev) => prev.filter((_, i) => i !== idx))} className="text-slate-500 hover:text-red-500"><Trash2 size={14} /></button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><label className="block text-xs text-slate-500 mb-1">所属实体</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.parentType || 'Concept'} onChange={(e) => { const copy = [...entities]; copy[idx].parentType = e.target.value as KnowledgeEntity['type']; setEntities(copy); }}>{ENTITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                    <div><label className="block text-xs text-slate-500 mb-1">实体类型</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.type} onChange={(e) => { const copy = [...entities]; copy[idx].type = e.target.value as KnowledgeEntity['type']; setEntities(copy); }}>{ENTITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                  </div>
+                  <div><label className="block text-xs text-slate-500 mb-1">所属实体</label><select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.parentType || ''} onChange={(e) => { const copy = [...entities]; copy[idx].parentType = e.target.value; copy[idx].type = e.target.value; setEntities(copy); }}><option value="">请选择实体分类</option>{entityTypeItems.map((t) => <option key={t.key} value={t.key}>{t.label}（{t.key}）</option>)}</select></div>
                   <div><label className="block text-xs text-slate-500 mb-1">实体内容</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.name} onChange={(e) => { const copy = [...entities]; copy[idx].name = e.target.value; setEntities(copy); }} /></div>
+                  <div className="space-y-2">
+                    <label className="block text-xs text-slate-500">关联其他实体（全文检索多选）</label>
+                    <input
+                      value={relationKeywords[entity.id] || ''}
+                      onChange={(e) => setRelationKeywords((prev) => ({ ...prev, [entity.id]: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="输入关键字快速检索实体"
+                    />
+                    <div className="max-h-28 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1">
+                      {availableEntities
+                        .filter((candidate) => candidate.id !== entity.id)
+                        .filter((candidate) => {
+                          const keyword = (relationKeywords[entity.id] || '').trim().toLowerCase();
+                          if (!keyword) return true;
+                          return (`${candidate.name} ${candidate.parentType || ''}`).toLowerCase().includes(keyword);
+                        })
+                        .map((candidate) => (
+                          <label key={candidate.id} className="flex items-center gap-2 text-xs text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(entity.relatedEntityIds?.includes(candidate.id))}
+                              onChange={(e) => {
+                                const copy = [...entities];
+                                const related = new Set(copy[idx].relatedEntityIds || []);
+                                if (e.target.checked) related.add(candidate.id);
+                                else related.delete(candidate.id);
+                                copy[idx].relatedEntityIds = Array.from(related);
+                                setEntities(copy);
+                              }}
+                            />
+                            {candidate.name || `未命名实体(${candidate.id})`}
+                          </label>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {(entity.relatedEntityIds || []).map((relatedId) => {
+                        const target = entities.find((item) => item.id === relatedId);
+                        if (!target) return null;
+                        return (
+                          <span key={relatedId} className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs inline-flex items-center gap-1">
+                            {target.name || relatedId}
+                            <button
+                              onClick={() => {
+                                const copy = [...entities];
+                                copy[idx].relatedEntityIds = (copy[idx].relatedEntityIds || []).filter((id) => id !== relatedId);
+                                setEntities(copy);
+                              }}
+                              className="hover:text-red-500"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div><label className="block text-xs text-slate-500 mb-1">上下文</label><textarea className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} value={entity.context} onChange={(e) => { const copy = [...entities]; copy[idx].context = e.target.value; setEntities(copy); }} /></div>
                 </div>
               ))}

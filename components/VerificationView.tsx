@@ -3,6 +3,7 @@ import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, SecurityLevel, Knowled
 import { Check, RefreshCw, Eye, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert, X } from 'lucide-react';
 import FilePreview from './FilePreview';
 import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
+import { listSettings } from '../services/settingsApi';
 
 interface VerificationViewProps {
   documents: ArchiveDocument[];
@@ -13,13 +14,6 @@ interface VerificationViewProps {
   currentUserId: string | number;
 }
 
-const ENTITY_TYPES = [
-  { value: 'Person', label: 'Person（人物）' },
-  { value: 'Location', label: 'Location（地点）' },
-  { value: 'Organization', label: 'Organization（组织）' },
-  { value: 'Event', label: 'Event（事件）' },
-  { value: 'Concept', label: 'Concept（概念）' },
-] as const;
 
 const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, onRefreshDocuments, currentUserRole, currentUserId }) => {
   const queue = useMemo(
@@ -35,9 +29,10 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [formData, setFormData] = useState<Partial<ArchiveMetadata>>({});
   const [entities, setEntities] = useState<KnowledgeEntity[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [relationKeyword, setRelationKeyword] = useState('');
+  const [relationKeywords, setRelationKeywords] = useState<Record<string, string>>({});
   const [categoryTree, setCategoryTree] = useState<ArchiveCategoryNode[]>([]);
   const [categoryPath, setCategoryPath] = useState<string[]>([]);
+  const [entityTypeItems, setEntityTypeItems] = useState<Array<{ key: string; label: string }>>([]);
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -60,6 +55,21 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
       });
   }, [activeDoc?.metadata?.category]);
 
+
+  useEffect(() => {
+    listSettings()
+      .then((items) => {
+        const map = new Map(items.map((item) => [item.key, item.value]));
+        const raw = map.get('entity_types_json');
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Array<{ key: string; label: string }>;
+        if (Array.isArray(parsed) && parsed.length > 0) setEntityTypeItems(parsed);
+      })
+      .catch(() => setEntityTypeItems([]));
+  }, []);
+
+  const availableEntities = useMemo(() => entities.filter((item) => item.name.trim()), [entities]);
+
   const handleInputChange = (field: keyof ArchiveMetadata, value: any) => setFormData((prev) => ({ ...prev, [field]: value }));
   const categoryLevels = buildCategoryLevels(categoryTree, categoryPath);
   const handleCategoryLevelChange = (level: number, value: string) => {
@@ -76,7 +86,6 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setIsProcessing(false);
   };
 
-  const relatedCandidates = (currentIndex: number) => entities.filter((_, idx) => idx !== currentIndex).filter((entity) => entity.name.includes(relationKeyword.trim()));
 
   if (queue.length === 0) {
     return <div className="h-full flex flex-col items-center justify-center text-slate-500"><Check size={48} className="text-emerald-500 mb-4" /><h3 className="text-xl font-semibold text-slate-800">全部处理完毕!</h3><p>当前没有待审查的文档。</p></div>;
@@ -158,20 +167,27 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
 
               {activeTab === 'entities' && (
                 <div className="space-y-3">
-                  <button onClick={() => setEntities((prev) => [...prev, { id: Date.now().toString(), name: '', type: 'Concept', parentType: 'Concept', relatedEntityIds: [], context: '', confidence: 100 }])} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2"><Plus size={14} />添加实体</button>
+                  <button onClick={() => setEntities((prev) => [...prev, { id: Date.now().toString(), name: '', type: '', parentType: '', relatedEntityIds: [], context: '', confidence: 100 }])} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2"><Plus size={14} />添加实体</button>
                   {entities.map((entity, idx) => (
                     <div key={entity.id || idx} className="rounded-lg border border-slate-200 p-3 space-y-2">
                       <div className="flex justify-between"><span className="text-sm font-medium">实体 {idx + 1}</span><button onClick={() => setEntities((prev) => prev.filter((_, i) => i !== idx))} className="text-slate-500 hover:text-red-500"><Trash2 size={14} /></button></div>
                       <div>
                         <label className="block text-xs text-slate-500 mb-1">所属实体</label>
-                        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.parentType || 'Concept'} onChange={(e) => { const copy = [...entities]; copy[idx].parentType = e.target.value as KnowledgeEntity['type']; copy[idx].type = e.target.value as KnowledgeEntity['type']; setEntities(copy); }}>{ENTITY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
+                        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.parentType || ''} onChange={(e) => { const copy = [...entities]; copy[idx].parentType = e.target.value; copy[idx].type = e.target.value; setEntities(copy); }}><option value="">请选择实体分类</option>{entityTypeItems.map((t) => <option key={t.key} value={t.key}>{t.label}（{t.key}）</option>)}</select>
                       </div>
                       <div><label className="block text-xs text-slate-500 mb-1">实体内容</label><input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={entity.name} onChange={(e) => { const copy = [...entities]; copy[idx].name = e.target.value; setEntities(copy); }} /></div>
                       <div className="space-y-2">
                         <label className="block text-xs text-slate-500">关联其他实体（可检索多选）</label>
-                        <input value={relationKeyword} onChange={(e) => setRelationKeyword(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="输入关键字筛选实体" />
+                        <input value={relationKeywords[entity.id] || ''} onChange={(e) => setRelationKeywords((prev) => ({ ...prev, [entity.id]: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="输入关键字全文检索实体" />
                         <div className="max-h-24 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1">
-                          {relatedCandidates(idx).map((candidate) => (
+                          {availableEntities
+                            .filter((candidate) => candidate.id !== entity.id)
+                            .filter((candidate) => {
+                              const keyword = (relationKeywords[entity.id] || '').trim().toLowerCase();
+                              if (!keyword) return true;
+                              return (`${candidate.name} ${candidate.parentType || ''}`).toLowerCase().includes(keyword);
+                            })
+                            .map((candidate) => (
                             <label key={candidate.id} className="flex items-center gap-2 text-xs text-slate-700">
                               <input
                                 type="checkbox"
@@ -193,7 +209,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
                           {(entity.relatedEntityIds || []).map((relatedId) => {
                             const target = entities.find((item) => item.id === relatedId);
                             if (!target) return null;
-                            return <span key={relatedId} className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs">{target.name || relatedId}</span>;
+                            return <span key={relatedId} className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs inline-flex items-center gap-1">{target.name || relatedId}<button onClick={() => { const copy = [...entities]; copy[idx].relatedEntityIds = (copy[idx].relatedEntityIds || []).filter((id) => id !== relatedId); setEntities(copy); }} className="hover:text-red-500"><Trash2 size={12} /></button></span>;
                           })}
                         </div>
                       </div>
