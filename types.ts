@@ -33,8 +33,8 @@ export enum SecurityLevel {
 export interface KnowledgeEntity {
   id: string;
   name: string;
-  type: 'Person' | 'Location' | 'Organization' | 'Event' | 'Concept';
-  parentType?: 'Person' | 'Location' | 'Organization' | 'Event' | 'Concept';
+  type: string;
+  parentType?: string;
   relatedEntityIds?: string[];
   context: string; // The sentence or timestamp where this appears (Positioning)
   confidence: number;
