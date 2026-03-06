@@ -34,6 +34,7 @@ def _build_curl_command(url: str, api_key: str, payload: dict) -> str:
 
 @bp.get("")
 @login_required
+@require_permission("canModify")
 def list_configs():
     configs = SystemConfig.query.order_by(SystemConfig.config_key.asc()).all()
     return jsonify(

@@ -41,7 +41,7 @@ const DEFAULT_LLM_MODELS: Record<LlmProvider, string> = {
 
 type EntityTypeItem = { key: string; label: string };
 type ArchiveCategoryTree = { name: string; children: string[] };
-type ApprovalNode = { userId: string; userName: string };
+type ApprovalNode = { mode: 'OR' | 'AND'; users: Array<{ userId: string; userName: string }> };
 
 const parseJsonSetting = <T,>(value: string | undefined, fallback: T): T => {
   if (!value) return fallback;
@@ -122,7 +122,17 @@ const SystemSettings: React.FC = () => {
         setLlmEnabled((map.get('llm.enabled') || 'true').toLowerCase() !== 'false');
         setSystemPrompt(map.get('llm.system_prompt') || DEFAULT_SYSTEM_PROMPT);
         setUserPromptTemplate(map.get('llm.user_prompt_template') || DEFAULT_USER_PROMPT_TEMPLATE);
-        setApprovalNodes(parseJsonSetting<ApprovalNode[]>(map.get('approval_workflow_json'), []));
+                const rawNodes = parseJsonSetting<any[]>(map.get('approval_workflow_json'), []);
+        const normalizedNodes: ApprovalNode[] = (Array.isArray(rawNodes) ? rawNodes : []).map((node) => {
+          const mode = String(node?.mode || 'OR').toUpperCase() === 'AND' ? 'AND' : 'OR';
+          const users = Array.isArray(node?.users)
+            ? node.users
+              .map((item: any) => ({ userId: String(item?.userId || ''), userName: String(item?.userName || '') }))
+              .filter((item: { userId: string }) => item.userId)
+            : (String(node?.userId || '') ? [{ userId: String(node.userId), userName: String(node?.userName || '') }] : []);
+          return { mode, users };
+        }).filter((node) => node.users.length > 0);
+        setApprovalNodes(normalizedNodes);
       })
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : '设置加载失败'))
       .finally(() => setLoading(false));
@@ -240,7 +250,7 @@ const SystemSettings: React.FC = () => {
     setSaving(true);
     setErrorMessage('');
     try {
-      await updateSetting('approval_workflow_json', JSON.stringify(approvalNodes.filter((node) => node.userId)), '入库审批流程配置');
+      await updateSetting('approval_workflow_json', JSON.stringify(approvalNodes.filter((node) => node.users.length > 0)), '入库审批流程配置');
       alert('审批流程已保存');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '审批流程保存失败');
@@ -347,22 +357,35 @@ const SystemSettings: React.FC = () => {
           )}
 
           {!loading && activeTab === 'approval' && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3 text-sm">
-              <p className="text-slate-600">通过增删审批节点并指定执行人来配置“确认入库”审批流程。</p>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3 text-sm"> 
+              <p className="text-slate-600">通过增删审批节点并指定执行人来配置“确认入库”审批流程；每个节点可配置多人并选择或签/会签。</p>
               {approvalNodes.map((node, idx) => (
-                <div key={`${node.userId}-${idx}`} className="grid grid-cols-12 gap-2 items-center">
-                  <span className="col-span-2 text-slate-500">节点 {idx + 1}</span>
-                  <select className="col-span-9 border border-slate-300 rounded px-2 py-1" value={node.userId} onChange={(e) => {
-                    const target = users.find((u) => String(u.id) === e.target.value);
-                    setApprovalNodes((prev) => prev.map((item, i) => i === idx ? { userId: e.target.value, userName: target?.name || '' } : item));
-                  }}>
-                    <option value="">请选择执行人</option>
-                    {users.map((user) => <option key={user.id} value={String(user.id)}>{user.name}（{user.department}）</option>)}
-                  </select>
-                  <button className="col-span-1 text-red-500" onClick={() => setApprovalNodes((prev) => prev.filter((_, i) => i !== idx))}><Trash2 size={14} /></button>
+                <div key={`approval-${idx}`} className="border border-slate-200 rounded-lg p-3 space-y-2"> 
+                  <div className="grid grid-cols-12 gap-2 items-center"> 
+                    <span className="col-span-2 text-slate-500">节点 {idx + 1}</span>
+                    <select className="col-span-3 border border-slate-300 rounded px-2 py-1" value={node.mode} onChange={(e) => {
+                      const mode = e.target.value === 'AND' ? 'AND' : 'OR';
+                      setApprovalNodes((prev) => prev.map((item, i) => i === idx ? { ...item, mode } : item));
+                    }}>
+                      <option value="OR">或签</option>
+                      <option value="AND">会签</option>
+                    </select>
+                    <select className="col-span-6 border border-slate-300 rounded px-2 py-1" multiple value={node.users.map((u) => u.userId)} onChange={(e) => {
+                      const selectedIds = Array.from(e.target.selectedOptions).map((item) => item.value);
+                      const selectedUsers = selectedIds.map((id) => {
+                        const target = users.find((u) => String(u.id) === id);
+                        return { userId: id, userName: target?.name || '' };
+                      });
+                      setApprovalNodes((prev) => prev.map((item, i) => i === idx ? { ...item, users: selectedUsers } : item));
+                    }}>
+                      {users.map((user) => <option key={user.id} value={String(user.id)}>{user.name}（{user.department}）</option>)}
+                    </select>
+                    <button className="col-span-1 text-red-500" onClick={() => setApprovalNodes((prev) => prev.filter((_, i) => i !== idx))}><Trash2 size={14} /></button>
+                  </div>
+                  <p className="text-xs text-slate-500">按住 Ctrl/Command 可多选审批人。</p>
                 </div>
               ))}
-              <button onClick={() => setApprovalNodes((prev) => [...prev, { userId: '', userName: '' }])} className="text-sm text-indigo-600 flex items-center gap-1"><Plus size={14} /> 新增审批节点</button>
+              <button onClick={() => setApprovalNodes((prev) => [...prev, { mode: 'OR', users: [] }])} className="text-sm text-indigo-600 flex items-center gap-1"><Plus size={14} /> 新增审批节点</button>
               <button onClick={saveApprovalFlow} disabled={saving} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"><Save size={14} /> 保存审批流程</button>
             </div>
           )}

@@ -12,7 +12,7 @@ import MyUploadsView from './components/MyUploadsView';
 import LoginView from './components/LoginView';
 import SystemLogsView from './components/SystemLogsView';
 import BackendJobsView from './components/BackendJobsView';
-import { login as loginApi, getCurrentUser, type AuthUser } from './services/authApi';
+import { login as loginApi, getCurrentUser, changePassword, type AuthUser } from './services/authApi';
 import { approveArchiveWithComment, createUpload, listArchives, rejectArchive, updateArchive } from './services/archiveApi';
 import { sha256Hex } from './services/crypto';
 import { getDashboardStats, type DashboardStatsResponse } from './services/statsApi';
@@ -28,6 +28,10 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState('');
   const [dashboard, setDashboard] = useState<DashboardStatsResponse | null>(null);
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const refreshArchives = async () => {
     try {
       const items = await listArchives();
@@ -157,7 +161,7 @@ const App: React.FC = () => {
       case 'users':
         return <UserManagement />;
       case 'settings':
-        return <SystemSettings />;
+        return userRole === UserRole.ADMIN ? <SystemSettings /> : <Dashboard data={dashboard} />;
       case 'logs':
         return <SystemLogsView />;
       case 'file-detail': {
@@ -177,6 +181,29 @@ const App: React.FC = () => {
     }
   };
 
+
+
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword) {
+      alert('请输入旧密码和新密码');
+      return;
+    }
+    try {
+      setPasswordSubmitting(true);
+      const oldDigest = await sha256Hex(oldPassword);
+      const newDigest = await sha256Hex(newPassword);
+      await changePassword(oldDigest, newDigest);
+      alert('密码修改成功，请使用新密码登录');
+      setShowChangePassword(false);
+      setOldPassword('');
+      setNewPassword('');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '修改密码失败');
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
+
   const reviewCount = documents.filter((d) => d.status === ArchiveStatus.REVIEW_NEEDED || d.status === ArchiveStatus.PROCESSING).length;
 
   if (!authUser) {
@@ -185,7 +212,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-50">
-      <Header userName={authUser.displayName} userDepartment={authUser.department} onLogout={handleLogout} />
+      <Header userName={authUser.displayName} userDepartment={authUser.department} onLogout={handleLogout} onOpenChangePassword={() => setShowChangePassword(true)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           currentView={currentView}
@@ -196,6 +223,19 @@ const App: React.FC = () => {
         />
         <main className="flex-1 overflow-y-auto custom-scrollbar relative">{renderView()}</main>
       </div>
+      {showChangePassword && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+            <h3 className="text-lg font-semibold text-slate-800">修改密码</h3>
+            <input type="password" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="请输入旧密码" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} />
+            <input type="password" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="请输入新密码" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <button className="px-3 py-1.5 border border-slate-300 rounded" onClick={() => setShowChangePassword(false)}>取消</button>
+              <button className="px-3 py-1.5 bg-indigo-600 text-white rounded disabled:opacity-50" disabled={passwordSubmitting} onClick={handleChangePassword}>{passwordSubmitting ? '提交中...' : '确认修改'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

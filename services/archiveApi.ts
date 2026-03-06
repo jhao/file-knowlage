@@ -54,6 +54,8 @@ export interface ReviewFlow {
   total: number;
   isFinalStep: boolean;
   nextApprover: { userId: string; userName?: string } | null;
+  nextApprovers: Array<{ userId: string; userName?: string }> ;
+  approvalMode: 'OR' | 'AND' | null;
   recentComments: string[];
 }
 
@@ -89,4 +91,12 @@ export const reparseArchive = async (documentId: string) => {
     body: JSON.stringify({}),
   });
   return result;
+};
+
+
+export const reassignCurrentApprover = async (documentId: string, userIds: string[]) => {
+  return apiRequest<{ item: ArchiveDocument; message: string; flow?: ReviewFlow }>(`/api/reviews/${documentId}/reassign`, {
+    method: 'POST',
+    body: JSON.stringify({ userIds }),
+  });
 };

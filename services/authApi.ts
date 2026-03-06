@@ -50,3 +50,12 @@ export const getCurrentUser = async (token: string): Promise<AuthUser> => {
   });
   return result.user;
 };
+
+export const changePassword = async (oldPasswordDigest: string, newPasswordDigest: string) => {
+  const token = localStorage.getItem('auth_token') || '';
+  return request<{ message: string }>('/api/auth/change-password', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: JSON.stringify({ oldPasswordDigest, newPasswordDigest }),
+  });
+};

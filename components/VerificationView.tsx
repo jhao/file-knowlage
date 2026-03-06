@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, SecurityLevel, KnowledgeEntity, UserRole } from '../types';
+import { ArchiveDocument, ArchiveStatus, ArchiveMetadata, SecurityLevel, KnowledgeEntity, UserRole, User } from '../types';
 import { Check, RefreshCw, Eye, Save, Type, Tags, FileText, Plus, Trash2, ShieldAlert, X } from 'lucide-react';
 import FilePreview from './FilePreview';
 import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
 import { listSettings } from '../services/settingsApi';
-import { approveArchiveWithComment, getReviewFlow, type ReviewFlow } from '../services/archiveApi';
+import { listUsers } from '../services/userApi';
+import { approveArchiveWithComment, getReviewFlow, reassignCurrentApprover, type ReviewFlow } from '../services/archiveApi';
 
 interface VerificationViewProps {
   documents: ArchiveDocument[];
@@ -37,6 +38,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [reviewFlow, setReviewFlow] = useState<ReviewFlow | null>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [approvalComment, setApprovalComment] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [reassignUserIds, setReassignUserIds] = useState<string[]>([]);
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -70,6 +73,11 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
         if (Array.isArray(parsed) && parsed.length > 0) setEntityTypeItems(parsed);
       })
       .catch(() => setEntityTypeItems([]));
+  }, []);
+
+
+  useEffect(() => {
+    listUsers().then(setUsers).catch(() => setUsers([]));
   }, []);
 
   const availableEntities = useMemo(() => entities.filter((item) => item.name.trim()), [entities]);
@@ -116,11 +124,37 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     getReviewFlow(activeDoc.id).then(setReviewFlow).catch(() => setReviewFlow(null));
   }, [activeDoc?.id]);
 
-  const currentApproverLabel = reviewFlow?.nextApprover?.userName || reviewFlow?.nextApprover?.userId || '未配置';
+  const currentApproverLabel = (reviewFlow?.nextApprovers || []).map((item) => item.userName || item.userId).join('、') || reviewFlow?.nextApprover?.userName || reviewFlow?.nextApprover?.userId || '未配置';
+
+  useEffect(() => {
+    if (!reviewFlow?.nextApprovers?.length) {
+      setReassignUserIds([]);
+      return;
+    }
+    setReassignUserIds(reviewFlow.nextApprovers.map((item) => String(item.userId)));
+  }, [reviewFlow?.currentIndex, activeDoc?.id]);
+
   const canApproveCurrentStep = !reviewFlow?.enabled
     || !reviewFlow?.nextApprover
     || String(reviewFlow.nextApprover.userId) === String(currentUserId);
 
+
+
+  const handleReassign = async () => {
+    if (!activeDoc) return;
+    if (reassignUserIds.length === 0) {
+      alert('请至少选择一个审批人');
+      return;
+    }
+    try {
+      const result = await reassignCurrentApprover(activeDoc.id, reassignUserIds);
+      setReviewFlow(result.flow || null);
+      alert(result.message || '改派成功');
+      await onRefreshDocuments();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '改派失败');
+    }
+  };
 
   if (queue.length === 0) {
     return <div className="h-full flex flex-col items-center justify-center text-slate-500"><Check size={48} className="text-emerald-500 mb-4" /><h3 className="text-xl font-semibold text-slate-800">全部处理完毕!</h3><p>当前没有待审查的文档。</p></div>;
@@ -266,8 +300,23 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
 
             <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-2">
               {!reviewFlow?.isFinalStep && (
-                <p className="text-xs text-slate-600">当前审批人：{currentApproverLabel}</p>
+                <p className="text-xs text-slate-600">当前审批人：{currentApproverLabel}（{reviewFlow?.approvalMode === 'AND' ? '会签' : '或签'}）</p>
               )}
+
+              {currentUserRole === UserRole.ADMIN && reviewFlow?.nextApprovers?.length ? (
+                <div className="space-y-2 border border-slate-200 rounded-lg p-2 bg-white"> 
+                  <p className="text-xs text-slate-600">管理员可改派当前审批人（范围限当前节点审批人）</p>
+                  <select className="w-full border border-slate-300 rounded px-2 py-1 text-xs" multiple value={reassignUserIds} onChange={(e) => setReassignUserIds(Array.from(e.target.selectedOptions).map((item) => item.value))}>
+                    {reviewFlow.nextApprovers.map((item) => {
+                      const target = users.find((user) => String(user.id) === String(item.userId));
+                      const label = target ? `${target.name}（${target.department}）` : (item.userName || item.userId);
+                      return <option key={item.userId} value={String(item.userId)}>{label}</option>;
+                    })}
+                  </select>
+                  <button className="px-2 py-1 text-xs rounded bg-slate-800 text-white" onClick={handleReassign}>修改当前审批人</button>
+                </div>
+              ) : null}
+
               {canApproveCurrentStep ? (
                 <div className="flex gap-3">
                   <button onClick={handleReject} className="flex-1 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 inline-flex items-center justify-center gap-2"><X size={14} />驳回</button>
