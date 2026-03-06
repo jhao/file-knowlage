@@ -14,3 +14,11 @@ export const listTaskExecutionLogs = async (taskId: string) => {
 export const deleteTask = async (taskId: string) => {
   await apiRequest(`/api/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
 };
+
+export const retryTask = async (taskId: string) => {
+  const result = await apiRequest<{ taskId: string; message: string }>(`/api/tasks/${encodeURIComponent(taskId)}/retry`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  return result;
+};

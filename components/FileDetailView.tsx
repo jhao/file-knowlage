@@ -4,6 +4,7 @@ import { ArrowLeft, RefreshCw, Wand2, Save, Type, Tags, FileText, Plus, Trash2, 
 import FilePreview from './FilePreview';
 import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
 import { listSettings } from '../services/settingsApi';
+import { reparseArchive } from '../services/archiveApi';
 
 interface FileDetailViewProps {
   document: ArchiveDocument;
@@ -66,10 +67,15 @@ const FileDetailView: React.FC<FileDetailViewProps> = ({ document, onBack, onUpd
 
   const runAIAnalysis = async () => {
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
+      const result = await reparseArchive(document.id);
+      onUpdateDocument(document.id, { status: 'PROCESSING' as any, aiTaskId: result.taskId, aiStatus: 'PENDING', aiMessage: '任务已创建，等待处理。' });
+      alert(`已创建重新解析任务：${result.taskId}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '创建任务失败');
+    } finally {
       setIsProcessing(false);
-      alert('AI 重新解析完成！');
-    }, 600);
+    }
   };
 
   const handleSave = () => {

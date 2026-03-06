@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { deleteTask, listTaskExecutionLogs, listTasks } from '../services/tasksApi';
+import { deleteTask, listTaskExecutionLogs, listTasks, retryTask } from '../services/tasksApi';
 import { AITaskExecutionLog, AITaskLog } from '../types';
 
 interface BackendJobsViewProps {
@@ -62,6 +62,7 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
   const [executionLogs, setExecutionLogs] = useState<AITaskExecutionLog[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
   const openedByFocusRef = useRef<string | null>(null);
 
   const load = async () => {
@@ -95,6 +96,19 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
       }
     } finally {
       setDeletingTaskId(null);
+    }
+  };
+
+  const handleRetryJob = async (taskId: string) => {
+    setRetryingTaskId(taskId);
+    try {
+      const result = await retryTask(taskId);
+      alert(`重试成功，新任务：${result.taskId}`);
+      await load();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '重试失败');
+    } finally {
+      setRetryingTaskId(null);
     }
   };
 
@@ -146,6 +160,11 @@ const BackendJobsView: React.FC<BackendJobsViewProps> = ({ focusTaskId }) => {
                 <td className="px-4 py-3">{job.message || '-'}</td>
                 <td className="px-4 py-3 text-slate-500">{new Date(job.updatedAt).toLocaleString()}</td>
                 <td className="px-4 py-3">
+                  {(job.status === 'FAILED' || job.status === 'DELETED') && (
+                    <button className={subtleBtn} onClick={() => handleRetryJob(job.taskId)} disabled={retryingTaskId === job.taskId}>
+                      {retryingTaskId === job.taskId ? '重试中...' : '重试'}
+                    </button>
+                  )}
                   <button className={subtleBtn} onClick={() => handleDeleteJob(job.taskId)} disabled={deletingTaskId === job.taskId}>
                     {deletingTaskId === job.taskId ? '删除中...' : '删除任务'}
                   </button>

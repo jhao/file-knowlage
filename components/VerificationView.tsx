@@ -4,6 +4,7 @@ import { Check, RefreshCw, Eye, Save, Type, Tags, FileText, Plus, Trash2, Shield
 import FilePreview from './FilePreview';
 import { buildCategoryLevels, findCategoryPath, loadArchiveCategoryTree, type ArchiveCategoryNode } from '../services/archiveCategory';
 import { listSettings } from '../services/settingsApi';
+import { approveArchiveWithComment, getReviewFlow, type ReviewFlow } from '../services/archiveApi';
 
 interface VerificationViewProps {
   documents: ArchiveDocument[];
@@ -33,6 +34,9 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [categoryTree, setCategoryTree] = useState<ArchiveCategoryNode[]>([]);
   const [categoryPath, setCategoryPath] = useState<string[]>([]);
   const [entityTypeItems, setEntityTypeItems] = useState<Array<{ key: string; label: string }>>([]);
+  const [reviewFlow, setReviewFlow] = useState<ReviewFlow | null>(null);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalComment, setApprovalComment] = useState('');
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -77,14 +81,40 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setCategoryPath(nextPath);
     handleInputChange('category', value || '未分类');
   };
-  const handleConfirm = () => activeDoc && onUpdateDocument(activeDoc.id, { status: ArchiveStatus.APPROVED, metadata: formData as ArchiveMetadata, entities });
+  const handleConfirm = () => setShowApprovalDialog(true);
   const handleReject = () => activeDoc && onUpdateDocument(activeDoc.id, { status: ArchiveStatus.REJECTED });
+
+  const submitApproval = async () => {
+    if (!activeDoc) return;
+    if (!approvalComment.trim()) {
+      alert('请输入审批意见');
+      return;
+    }
+    await onUpdateDocument(activeDoc.id, { metadata: formData as ArchiveMetadata, entities });
+    const result = await approveArchiveWithComment(activeDoc.id, approvalComment.trim());
+    onUpdateDocument(activeDoc.id, { ...result.item, status: result.item.status });
+    setApprovalComment('');
+    setShowApprovalDialog(false);
+    alert(result.message);
+    await onRefreshDocuments();
+  };
 
   const runAIAnalysis = async () => {
     setIsProcessing(true);
     await onRefreshDocuments();
     setIsProcessing(false);
   };
+
+  const parseAiStateLabel = (doc: ArchiveDocument) => {
+    if (doc.aiStatus === 'FAILED') return 'AI解析失败';
+    if (doc.aiStatus === 'SUCCESS' || doc.status === ArchiveStatus.REVIEW_NEEDED) return 'AI解析完毕';
+    return '队列中';
+  };
+
+  useEffect(() => {
+    if (!activeDoc) return;
+    getReviewFlow(activeDoc.id).then(setReviewFlow).catch(() => setReviewFlow(null));
+  }, [activeDoc?.id]);
 
 
   if (queue.length === 0) {
@@ -113,7 +143,10 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
           <div className="w-[520px] bg-white flex flex-col relative">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
               <h3 className="font-semibold text-slate-800">AI智能审查</h3>
-              <button onClick={runAIAnalysis} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2" disabled={isProcessing}>{isProcessing ? <><RefreshCw size={14} className="animate-spin" />刷新中</> : '刷新结果'}</button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">{parseAiStateLabel(activeDoc)}</span>
+                <button onClick={runAIAnalysis} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center gap-2" disabled={isProcessing}>{isProcessing ? <><RefreshCw size={14} className="animate-spin" />刷新中</> : '刷新结果'}</button>
+              </div>
             </div>
 
             <div className="flex border-b border-slate-200">
@@ -229,6 +262,29 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
             <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
               <button onClick={handleReject} className="flex-1 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 inline-flex items-center justify-center gap-2"><X size={14} />驳回</button>
               <button onClick={handleConfirm} className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center justify-center gap-2"><Save size={16} />确认入库</button>
+            </div>
+            <div className="px-4 pb-4 text-xs text-slate-500 bg-slate-50">
+              {reviewFlow?.isFinalStep ? '本次为最终审批节点。' : `下一级审批人：${reviewFlow?.nextApprover?.userName || reviewFlow?.nextApprover?.userId || '未配置'}`}
+            </div>
+          </div>
+        </div>
+      )}
+      {showApprovalDialog && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+            <h4 className="font-semibold text-slate-800">确认入库</h4>
+            <p className="text-xs text-slate-500">请输入审批意见后再确认。</p>
+            {reviewFlow?.recentComments?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {reviewFlow.recentComments.slice(0, 5).map((item, idx) => (
+                  <button key={`${item}-${idx}`} className="px-2 py-1 text-xs rounded border border-slate-200 hover:bg-slate-50" onClick={() => setApprovalComment(item)}>{item}</button>
+                ))}
+              </div>
+            ) : null}
+            <textarea className="w-full h-24 border border-slate-300 rounded-lg p-2 text-sm" value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="请输入审批意见" />
+            <div className="flex justify-end gap-2">
+              <button className="px-3 py-1.5 rounded border border-slate-300" onClick={() => setShowApprovalDialog(false)}>取消</button>
+              <button className="px-3 py-1.5 rounded bg-indigo-600 text-white" onClick={submitApproval}>确定入库</button>
             </div>
           </div>
         </div>

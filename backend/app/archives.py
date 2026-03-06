@@ -3,9 +3,9 @@ import uuid
 
 from flask import Blueprint, g, jsonify, request
 
-from .auth import log_action, login_required, require_permission
+from .auth import log_action, log_ai_api_call, login_required, require_permission
 from .extensions import db
-from .models import Archive, ArchiveEntity, ArchiveMetadata, ArchiveVersion
+from .models import AITask, Archive, ArchiveEntity, ArchiveMetadata, ArchiveVersion
 
 bp = Blueprint("archives", __name__, url_prefix="/api/archives")
 
@@ -178,3 +178,27 @@ def delete_archive(document_id: str):
     db.session.commit()
     log_action("ARCHIVE_DELETE", "archive", document_id, "删除档案")
     return jsonify({"message": "删除成功"})
+
+
+@bp.post('/<string:document_id>/reparse')
+@login_required
+@require_permission("canImport")
+def reparse_archive(document_id: str):
+    archive = Archive.query.filter_by(document_id=document_id).first_or_404()
+    if g.current_user.role != "管理员" and archive.uploader_id != g.current_user.id:
+        return jsonify({"message": "无权重新解析该档案"}), 403
+
+    task_id = f"task-{uuid.uuid4().hex[:12]}"
+    task = AITask(
+        task_id=task_id,
+        archive_id=archive.id,
+        task_type="PARSE",
+        status="PENDING",
+        result_message="手动触发重新 AI 解析，等待处理",
+    )
+    archive.status = "PROCESSING"
+    db.session.add(task)
+    db.session.commit()
+    log_ai_api_call("AI_PARSE_REQUEUE", f"档案 {archive.file_name} 触发重新解析任务 {task_id}", task_id)
+    log_action("ARCHIVE_REPARSE", "archive", document_id, f"重新解析任务 {task_id}")
+    return jsonify({"taskId": task_id, "item": archive.to_dict()})
