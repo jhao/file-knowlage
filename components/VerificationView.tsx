@@ -40,6 +40,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [approvalComment, setApprovalComment] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [reassignUserIds, setReassignUserIds] = useState<string[]>([]);
+  const [showReassignDialog, setShowReassignDialog] = useState(false);
 
   const activeDoc = queue.find((d) => d.id === selectedId) || queue[0];
 
@@ -140,6 +141,10 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
 
 
 
+  const handleOpenReassignDialog = () => {
+    setShowReassignDialog(true);
+  };
+
   const handleReassign = async () => {
     if (!activeDoc) return;
     if (reassignUserIds.length === 0) {
@@ -150,6 +155,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
       const result = await reassignCurrentApprover(activeDoc.id, reassignUserIds);
       setReviewFlow(result.flow || null);
       alert(result.message || '改派成功');
+      setShowReassignDialog(false);
       await onRefreshDocuments();
     } catch (error) {
       alert(error instanceof Error ? error.message : '改派失败');
@@ -305,15 +311,8 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
 
               {currentUserRole === UserRole.ADMIN && reviewFlow?.nextApprovers?.length ? (
                 <div className="space-y-2 border border-slate-200 rounded-lg p-2 bg-white"> 
-                  <p className="text-xs text-slate-600">管理员可改派当前审批人（范围限当前节点审批人）</p>
-                  <select className="w-full border border-slate-300 rounded px-2 py-1 text-xs" multiple value={reassignUserIds} onChange={(e) => setReassignUserIds(Array.from(e.target.selectedOptions).map((item) => item.value))}>
-                    {reviewFlow.nextApprovers.map((item) => {
-                      const target = users.find((user) => String(user.id) === String(item.userId));
-                      const label = target ? `${target.name}（${target.department}）` : (item.userName || item.userId);
-                      return <option key={item.userId} value={String(item.userId)}>{label}</option>;
-                    })}
-                  </select>
-                  <button className="px-2 py-1 text-xs rounded bg-slate-800 text-white" onClick={handleReassign}>修改当前审批人</button>
+                  <p className="text-xs text-slate-600">管理员可改派当前审批人（范围是系统所有人）</p>
+                  <button className="px-2 py-1 text-xs rounded bg-slate-800 text-white" onClick={handleOpenReassignDialog}>修改当前审批人</button>
                 </div>
               ) : null}
 
@@ -352,6 +351,24 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
           </div>
         </div>
       )}
+
+      {showReassignDialog && reviewFlow ? (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+            <h4 className="font-semibold text-slate-800">修改当前审批人</h4>
+            <p className="text-xs text-slate-500">可从系统所有用户中选择当前节点审批人（按住 Ctrl/Command 可多选）。</p>
+            <select className="w-full h-56 border border-slate-300 rounded px-2 py-1 text-sm" multiple value={reassignUserIds} onChange={(e) => setReassignUserIds(Array.from(e.target.selectedOptions).map((item) => item.value))}>
+              {users.map((item) => (
+                <option key={item.id} value={String(item.id)}>{item.name}（{item.department}）</option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button className="px-3 py-1.5 rounded border border-slate-300" onClick={() => setShowReassignDialog(false)}>取消</button>
+              <button className="px-3 py-1.5 rounded bg-slate-800 text-white" onClick={handleReassign}>保存</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

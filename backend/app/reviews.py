@@ -3,7 +3,7 @@ import json
 
 from .auth import log_action, login_required, require_permission
 from .extensions import db
-from .models import ApprovalRecord, Archive, SystemConfig
+from .models import ApprovalRecord, Archive, SystemConfig, User
 
 bp = Blueprint("reviews", __name__, url_prefix="/api/reviews")
 
@@ -104,7 +104,7 @@ def _ensure_current_step_state(archive: Archive, workflow: list[dict], current_i
     mode = str(workflow[current_index].get("mode") or "OR").upper()
     manual_users = _parse_archive_current_user_ids(archive)
 
-    valid_manual_users = [uid for uid in manual_users if uid in default_users]
+    valid_manual_users = manual_users
     if valid_manual_users:
         # 当前节点已手工改派
         if archive.current_approval_mode != mode:
@@ -260,9 +260,9 @@ def reassign(document_id: str):
     if not target_ids:
         return jsonify({"message": "请至少选择一个审批人"}), 400
 
-    node_ids = {str(item.get("userId")) for item in flow.get("nextApprovers") or []}
-    if not set(target_ids).issubset(node_ids):
-        return jsonify({"message": "改派审批人必须在当前节点可选范围内"}), 400
+    system_user_ids = {str(item.id) for item in User.query.all()}
+    if not set(target_ids).issubset(system_user_ids):
+        return jsonify({"message": "改派审批人必须是系统内有效用户"}), 400
 
     archive.current_approval_user_ids = json.dumps(target_ids, ensure_ascii=False)
     db.session.commit()
