@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, reviewCount,
     { id: 'jobs', label: '后台job管理', icon: Timer },
     { id: 'logs', label: '系统日志', icon: History },
     ...(currentUserRole === UserRole.ADMIN ? [{ id: 'users', label: '人员权限管理', icon: Users }] : []),
-    { id: 'settings', label: '系统设置', icon: Settings },
+    ...(currentUserRole === UserRole.ADMIN ? [{ id: 'settings', label: '系统设置', icon: Settings }] : []),
   ];
 
   return (

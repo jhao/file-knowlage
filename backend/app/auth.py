@@ -149,6 +149,27 @@ def login():
     return jsonify({"accessToken": token, "user": user.to_dict()})
 
 
+
+
+@bp.post("/change-password")
+@login_required
+def change_password():
+    data = request.get_json(silent=True) or {}
+    old_password_digest = str(data.get("oldPasswordDigest") or "").strip()
+    new_password_digest = str(data.get("newPasswordDigest") or "").strip()
+
+    if not old_password_digest or not new_password_digest:
+        return jsonify({"message": "旧密码和新密码不能为空"}), 400
+
+    user = g.current_user
+    if not user.check_password(old_password_digest):
+        return jsonify({"message": "旧密码错误"}), 400
+
+    user.set_password(new_password_digest)
+    db.session.commit()
+    log_action("CHANGE_PASSWORD", "user", str(user.id), "用户修改密码")
+    return jsonify({"message": "密码修改成功"})
+
 @bp.get("/me")
 @login_required
 def me():

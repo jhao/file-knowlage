@@ -58,6 +58,8 @@ class Archive(db.Model, TimestampMixin):
     department = db.Column(db.String(128), nullable=False, default="档案馆")
     security_level = db.Column(db.String(32), nullable=False, default="内部")
     uploader_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    current_approval_user_ids = db.Column(db.Text, nullable=True)
+    current_approval_mode = db.Column(db.String(16), nullable=True)
 
     uploader = db.relationship("User", back_populates="archives")
     metadata_record = db.relationship(
@@ -203,6 +205,7 @@ class ApprovalRecord(db.Model, TimestampMixin):
     action = db.Column(db.String(32), nullable=False)
     comment = db.Column(db.Text, nullable=True)
     reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    step_index = db.Column(db.Integer, nullable=False, default=0)
 
 
 class OperationLog(db.Model):

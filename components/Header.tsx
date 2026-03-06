@@ -1,13 +1,14 @@
 import React from 'react';
-import { Bell, Search, UserCircle, School, LogOut } from 'lucide-react';
+import { Bell, Search, UserCircle, School, LogOut, KeyRound } from 'lucide-react';
 
 interface HeaderProps {
   userName: string;
   userDepartment: string;
   onLogout: () => void;
+  onOpenChangePassword: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ userName, userDepartment, onLogout }) => {
+const Header: React.FC<HeaderProps> = ({ userName, userDepartment, onLogout, onOpenChangePassword }) => {
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-3">
@@ -41,7 +42,15 @@ const Header: React.FC<HeaderProps> = ({ userName, userDepartment, onLogout }) =
               <p className="text-sm font-semibold text-slate-800">{userName}</p>
               <p className="text-xs text-slate-500">{userDepartment}</p>
             </div>
-            <UserCircle className="text-slate-400" size={32} />
+            <button
+              type="button"
+              onClick={onOpenChangePassword}
+              className="inline-flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors"
+              title="修改密码"
+            >
+              <UserCircle className="text-slate-400" size={32} />
+              <KeyRound size={16} />
+            </button>
             <button
               type="button"
               onClick={onLogout}
