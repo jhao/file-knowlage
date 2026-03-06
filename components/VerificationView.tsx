@@ -116,6 +116,11 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     getReviewFlow(activeDoc.id).then(setReviewFlow).catch(() => setReviewFlow(null));
   }, [activeDoc?.id]);
 
+  const currentApproverLabel = reviewFlow?.nextApprover?.userName || reviewFlow?.nextApprover?.userId || '未配置';
+  const canApproveCurrentStep = !reviewFlow?.enabled
+    || !reviewFlow?.nextApprover
+    || String(reviewFlow.nextApprover.userId) === String(currentUserId);
+
 
   if (queue.length === 0) {
     return <div className="h-full flex flex-col items-center justify-center text-slate-500"><Check size={48} className="text-emerald-500 mb-4" /><h3 className="text-xl font-semibold text-slate-800">全部处理完毕!</h3><p>当前没有待审查的文档。</p></div>;
@@ -259,9 +264,18 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-              <button onClick={handleReject} className="flex-1 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 inline-flex items-center justify-center gap-2"><X size={14} />驳回</button>
-              <button onClick={handleConfirm} className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center justify-center gap-2"><Save size={16} />确认入库</button>
+            <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-2">
+              {!reviewFlow?.isFinalStep && (
+                <p className="text-xs text-slate-600">当前审批人：{currentApproverLabel}</p>
+              )}
+              {canApproveCurrentStep ? (
+                <div className="flex gap-3">
+                  <button onClick={handleReject} className="flex-1 border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 inline-flex items-center justify-center gap-2"><X size={14} />驳回</button>
+                  <button onClick={handleConfirm} className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 inline-flex items-center justify-center gap-2"><Save size={16} />确认入库</button>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">当前节点需由 {currentApproverLabel} 审批，您暂无操作权限。</p>
+              )}
             </div>
             <div className="px-4 pb-4 text-xs text-slate-500 bg-slate-50">
               {reviewFlow?.isFinalStep ? '本次为最终审批节点。' : `下一级审批人：${reviewFlow?.nextApprover?.userName || reviewFlow?.nextApprover?.userId || '未配置'}`}
