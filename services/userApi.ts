@@ -4,6 +4,7 @@ import { AuthUser } from './authApi';
 
 const toUser = (user: AuthUser): User => ({
   id: String(user.id),
+  username: user.username,
   name: user.displayName,
   role: user.role as UserRole,
   department: user.department,
