@@ -41,11 +41,32 @@ export const updateArchive = async (documentId: string, updates: Partial<Archive
 };
 
 export const approveArchive = async (documentId: string) => {
-  const result = await apiRequest<{ item: ArchiveDocument }>(`/api/reviews/${documentId}/approve`, {
+  const result = await apiRequest<{ item: ArchiveDocument; message: string; flow?: ReviewFlow }>(`/api/reviews/${documentId}/approve`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
+  return result;
+};
+
+export interface ReviewFlow {
+  enabled: boolean;
+  currentIndex: number;
+  total: number;
+  isFinalStep: boolean;
+  nextApprover: { userId: string; userName?: string } | null;
+  recentComments: string[];
+}
+
+export const getReviewFlow = async (documentId: string) => {
+  const result = await apiRequest<{ item: ReviewFlow }>(`/api/reviews/${documentId}/flow`);
   return result.item;
+};
+
+export const approveArchiveWithComment = async (documentId: string, comment: string) => {
+  return apiRequest<{ item: ArchiveDocument; message: string; flow?: ReviewFlow }>(`/api/reviews/${documentId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ comment }),
+  });
 };
 
 export const rejectArchive = async (documentId: string) => {
@@ -60,4 +81,12 @@ export const rejectArchive = async (documentId: string) => {
 export const getArchivePreview = async (documentId: string) => {
   const result = await apiRequest<{ contentBase64: string | null }>(`/api/archives/${documentId}/preview`);
   return result.contentBase64 || undefined;
+};
+
+export const reparseArchive = async (documentId: string) => {
+  const result = await apiRequest<{ taskId: string; item: ArchiveDocument }>(`/api/archives/${documentId}/reparse`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  return result;
 };

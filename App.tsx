@@ -13,7 +13,7 @@ import LoginView from './components/LoginView';
 import SystemLogsView from './components/SystemLogsView';
 import BackendJobsView from './components/BackendJobsView';
 import { login as loginApi, getCurrentUser, type AuthUser } from './services/authApi';
-import { approveArchive, createUpload, listArchives, rejectArchive, updateArchive } from './services/archiveApi';
+import { approveArchiveWithComment, createUpload, listArchives, rejectArchive, updateArchive } from './services/archiveApi';
 import { sha256Hex } from './services/crypto';
 import { getDashboardStats, type DashboardStatsResponse } from './services/statsApi';
 import { ArchiveDocument, ArchiveStatus, UserRole } from './types';
@@ -101,7 +101,9 @@ const App: React.FC = () => {
   const updateDocument = async (id: string, updates: Partial<ArchiveDocument>) => {
     try {
       if (updates.status === ArchiveStatus.APPROVED) {
-        const item = await approveArchive(id);
+        const approvalComment = String((updates as any).approvalComment || '').trim();
+        const result = await approveArchiveWithComment(id, approvalComment);
+        const item = result.item;
         setDocuments((prev) => prev.map((doc) => (doc.id === id ? { ...item, ...updates } : doc)));
         await refreshDashboard();
         return;
