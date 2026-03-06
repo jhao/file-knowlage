@@ -18,6 +18,7 @@ interface VerificationViewProps {
 
 
 const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdateDocument, onRefreshDocuments, currentUserRole, currentUserId }) => {
+  const approvalHistoryStorageKey = `approval-comment-history-${currentUserId}`;
   const queue = useMemo(
     () => documents.filter((d) => {
       const mineOrAdmin = currentUserRole === UserRole.ADMIN || String(d.uploadedBy) === String(currentUserId);
@@ -38,6 +39,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
   const [reviewFlow, setReviewFlow] = useState<ReviewFlow | null>(null);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [approvalComment, setApprovalComment] = useState('');
+  const [approvalHistory, setApprovalHistory] = useState<string[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reassignUserIds, setReassignUserIds] = useState<string[]>([]);
   const [showReassignDialog, setShowReassignDialog] = useState(false);
@@ -81,6 +83,24 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     listUsers().then(setUsers).catch(() => setUsers([]));
   }, []);
 
+  useEffect(() => {
+    const raw = localStorage.getItem(approvalHistoryStorageKey);
+    if (!raw) {
+      setApprovalHistory([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as string[];
+      if (Array.isArray(parsed)) {
+        setApprovalHistory(parsed.filter((item) => typeof item === 'string').slice(0, 5));
+      } else {
+        setApprovalHistory([]);
+      }
+    } catch {
+      setApprovalHistory([]);
+    }
+  }, [approvalHistoryStorageKey]);
+
   const availableEntities = useMemo(() => entities.filter((item) => item.name.trim()), [entities]);
 
   const handleInputChange = (field: keyof ArchiveMetadata, value: any) => setFormData((prev) => ({ ...prev, [field]: value }));
@@ -99,8 +119,13 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
       alert('请输入审批意见');
       return;
     }
+    const finalComment = approvalComment.trim();
+    const nextHistory = [finalComment, ...approvalHistory.filter((item) => item !== finalComment)].slice(0, 5);
+    setApprovalHistory(nextHistory);
+    localStorage.setItem(approvalHistoryStorageKey, JSON.stringify(nextHistory));
+
     await onUpdateDocument(activeDoc.id, { metadata: formData as ArchiveMetadata, entities });
-    const result = await approveArchiveWithComment(activeDoc.id, approvalComment.trim());
+    const result = await approveArchiveWithComment(activeDoc.id, finalComment);
     onUpdateDocument(activeDoc.id, { ...result.item, status: result.item.status });
     setApprovalComment('');
     setShowApprovalDialog(false);
@@ -336,9 +361,9 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
           <div className="w-full max-w-lg bg-white rounded-xl border border-slate-200 p-4 space-y-3">
             <h4 className="font-semibold text-slate-800">确认入库</h4>
             <p className="text-xs text-slate-500">请输入审批意见后再确认。</p>
-            {reviewFlow?.recentComments?.length ? (
+            {approvalHistory.length ? (
               <div className="flex flex-wrap gap-2">
-                {reviewFlow.recentComments.slice(0, 5).map((item, idx) => (
+                {approvalHistory.map((item, idx) => (
                   <button key={`${item}-${idx}`} className="px-2 py-1 text-xs rounded border border-slate-200 hover:bg-slate-50" onClick={() => setApprovalComment(item)}>{item}</button>
                 ))}
               </div>
