@@ -101,12 +101,13 @@ const UserManagement: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-            <tr><th className="px-6 py-4">用户</th><th className="px-6 py-4">角色</th><th className="px-6 py-4">部门</th><th className="px-6 py-4">权限配置</th><th className="px-6 py-4">审批流</th><th className="px-6 py-4 text-right">操作</th></tr>
+            <tr><th className="px-6 py-4">用户</th><th className="px-6 py-4">登录账号</th><th className="px-6 py-4">角色</th><th className="px-6 py-4">部门</th><th className="px-6 py-4">权限配置</th><th className="px-6 py-4">审批流</th><th className="px-6 py-4 text-right">操作</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4 font-medium text-slate-800">{user.name}</td>
+                <td className="px-6 py-4 text-slate-500">{user.username}</td>
                 <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${user.role === UserRole.ADMIN ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{user.role}</span></td>
                 <td className="px-6 py-4">{user.department}</td>
                 <td className="px-6 py-4"><div className="flex gap-2"><span className={`w-5 h-5 rounded flex items-center justify-center text-xs border ${user.permissions.canImport ? 'bg-green-50 border-green-200 text-green-600' : 'bg-slate-50 border-slate-200 text-slate-300'}`}>入</span><span className={`w-5 h-5 rounded flex items-center justify-center text-xs border ${user.permissions.canExport ? 'bg-green-50 border-green-200 text-green-600' : 'bg-slate-50 border-slate-200 text-slate-300'}`}>出</span><span className={`w-5 h-5 rounded flex items-center justify-center text-xs border ${user.permissions.canModify ? 'bg-green-50 border-green-200 text-green-600' : 'bg-slate-50 border-slate-200 text-slate-300'}`}>改</span><span className={`w-5 h-5 rounded flex items-center justify-center text-xs border ${user.permissions.canDelete ? 'bg-green-50 border-green-200 text-green-600' : 'bg-slate-50 border-slate-200 text-slate-300'}`}>删</span></div></td>
