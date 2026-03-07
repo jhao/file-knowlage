@@ -159,7 +159,7 @@ def _build_review_flow(archive: Archive) -> dict:
     unknown_user_ids = [item.get("userId") for item in next_approvers if not item.get("userName")]
     if unknown_user_ids:
         user_rows = User.query.filter(User.id.in_(unknown_user_ids)).all()
-        name_map = {str(item.id): item.name or "" for item in user_rows}
+        name_map = {str(item.id): item.display_name or "" for item in user_rows}
         for item in next_approvers:
             if not item.get("userName"):
                 item["userName"] = name_map.get(item["userId"], "")
