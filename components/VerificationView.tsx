@@ -121,16 +121,21 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     }
     const finalComment = approvalComment.trim();
     const nextHistory = [finalComment, ...approvalHistory.filter((item) => item !== finalComment)].slice(0, 5);
-    setApprovalHistory(nextHistory);
-    localStorage.setItem(approvalHistoryStorageKey, JSON.stringify(nextHistory));
 
-    await onUpdateDocument(activeDoc.id, { metadata: formData as ArchiveMetadata, entities });
-    const result = await approveArchiveWithComment(activeDoc.id, finalComment);
-    onUpdateDocument(activeDoc.id, { ...result.item, status: result.item.status });
-    setApprovalComment('');
-    setShowApprovalDialog(false);
-    alert(result.message);
-    await onRefreshDocuments();
+    try {
+      await onUpdateDocument(activeDoc.id, { metadata: formData as ArchiveMetadata, entities });
+      const result = await approveArchiveWithComment(activeDoc.id, finalComment);
+      onUpdateDocument(activeDoc.id, { ...result.item, status: result.item.status });
+      setApprovalHistory(nextHistory);
+      localStorage.setItem(approvalHistoryStorageKey, JSON.stringify(nextHistory));
+      setApprovalComment('');
+      setShowApprovalDialog(false);
+      alert(result.message);
+      await onRefreshDocuments();
+      await refreshReviewFlow(activeDoc.id);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '审批入库失败，请稍后重试');
+    }
   };
 
   const runAIAnalysis = async () => {
@@ -145,9 +150,18 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     return '队列中';
   };
 
+  const refreshReviewFlow = async (documentId: string) => {
+    try {
+      const latestFlow = await getReviewFlow(documentId);
+      setReviewFlow(latestFlow);
+    } catch {
+      setReviewFlow(null);
+    }
+  };
+
   useEffect(() => {
     if (!activeDoc) return;
-    getReviewFlow(activeDoc.id).then(setReviewFlow).catch(() => setReviewFlow(null));
+    refreshReviewFlow(activeDoc.id);
   }, [activeDoc?.id]);
 
   const currentApproverLabel = (reviewFlow?.nextApprovers || []).map((item) => item.userName || item.userId).join('、') || reviewFlow?.nextApprover?.userName || reviewFlow?.nextApprover?.userId || '未配置';
@@ -160,9 +174,13 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
     setReassignUserIds(reviewFlow.nextApprovers.map((item) => String(item.userId)));
   }, [reviewFlow?.currentIndex, activeDoc?.id]);
 
+  const currentStepApproverIds = reviewFlow?.nextApprovers?.length
+    ? reviewFlow.nextApprovers.map((item) => String(item.userId))
+    : reviewFlow?.nextApprover ? [String(reviewFlow.nextApprover.userId)] : [];
+
   const canApproveCurrentStep = !reviewFlow?.enabled
-    || !reviewFlow?.nextApprover
-    || String(reviewFlow.nextApprover.userId) === String(currentUserId);
+    || currentStepApproverIds.length === 0
+    || currentStepApproverIds.includes(String(currentUserId));
 
 
 
@@ -182,6 +200,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
       alert(result.message || '改派成功');
       setShowReassignDialog(false);
       await onRefreshDocuments();
+      await refreshReviewFlow(activeDoc.id);
     } catch (error) {
       alert(error instanceof Error ? error.message : '改派失败');
     }
@@ -334,7 +353,7 @@ const VerificationView: React.FC<VerificationViewProps> = ({ documents, onUpdate
                 <p className="text-xs text-slate-600">当前审批人：{currentApproverLabel}（{reviewFlow?.approvalMode === 'AND' ? '会签' : '或签'}）</p>
               )}
 
-              {currentUserRole === UserRole.ADMIN && reviewFlow?.nextApprovers?.length ? (
+              {currentUserRole === UserRole.ADMIN && reviewFlow?.enabled && reviewFlow?.nextApprover ? (
                 <div className="space-y-2 border border-slate-200 rounded-lg p-2 bg-white"> 
                   <p className="text-xs text-slate-600">管理员可改派当前审批人（范围是系统所有人）</p>
                   <button className="px-2 py-1 text-xs rounded bg-slate-800 text-white" onClick={handleOpenReassignDialog}>修改当前审批人</button>
