@@ -146,11 +146,23 @@ def _build_review_flow(archive: Archive) -> dict:
         }
 
     users, mode = _ensure_current_step_state(archive, workflow, current_index)
-    next_approvers = []
+    node_user_map = {}
     for user in workflow[current_index].get("users", []):
-        user_id = str(user.get("userId"))
-        if user_id in users:
-            next_approvers.append({"userId": user_id, "userName": user.get("userName") or ""})
+        user_id = str(user.get("userId") or "").strip()
+        if user_id:
+            node_user_map[user_id] = user.get("userName") or ""
+
+    next_approvers = []
+    for user_id in users:
+        next_approvers.append({"userId": user_id, "userName": node_user_map.get(user_id, "")})
+
+    unknown_user_ids = [item.get("userId") for item in next_approvers if not item.get("userName")]
+    if unknown_user_ids:
+        user_rows = User.query.filter(User.id.in_(unknown_user_ids)).all()
+        name_map = {str(item.id): item.name or "" for item in user_rows}
+        for item in next_approvers:
+            if not item.get("userName"):
+                item["userName"] = name_map.get(item["userId"], "")
 
     next_approver = next_approvers[0] if next_approvers else None
     return {
@@ -198,7 +210,9 @@ def approve(document_id: str):
 
     flow = _build_review_flow(archive)
     approvers = [str(item.get("userId")) for item in flow.get("nextApprovers") or [] if str(item.get("userId"))]
-    if flow["enabled"] and approvers:
+    if flow["enabled"]:
+        if not approvers:
+            return jsonify({"message": "当前审批节点未配置有效审批人，请联系系统管理员改派"}), 400
         if str(g.current_user.id) not in approvers:
             return jsonify({"message": "当前审批节点执行人不匹配"}), 403
 
