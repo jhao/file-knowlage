@@ -4,6 +4,48 @@
 - 前端：React + TypeScript + Vite
 - 后端：Flask + SQLAlchemy（支持 SQLite / MySQL）
 
+
+## 系统功能结构图
+
+```mermaid
+flowchart TD
+    A[UniArchive AI 系统]
+
+    A --> B[用户与权限]
+    B --> B1[登录认证]
+    B --> B2[用户管理]
+
+    A --> C[档案管理]
+    C --> C1[档案主数据]
+    C --> C2[元数据与实体]
+    C --> C3[版本管理]
+
+    A --> D[文件接入与处理]
+    D --> D1[文件上传]
+    D --> D2[任务调度]
+    D --> D3[AI元数据解析]
+
+    A --> E[审核工作台]
+    E --> E1[人工审核队列]
+    E --> E2[审核通过/驳回]
+
+    A --> F[检索与统计]
+    F --> F1[关键词/实体检索]
+    F --> F2[仪表盘统计]
+
+    A --> G[系统配置与运维]
+    G --> G1[LLM配置]
+    G --> G2[健康检查]
+
+    classDef aiHighlight fill:#ffe8a3,stroke:#d97706,stroke-width:2px,color:#111827;
+    classDef manualHighlight fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#111827;
+
+    class D3,G1 aiHighlight;
+    class E1,E2 manualHighlight;
+```
+
+> 标注说明：黄色节点为 **AI 相关功能**，红色节点为 **人工审核相关功能**。
+
 ## 1. 前端运行
 
 ```bash
