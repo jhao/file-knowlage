@@ -204,3 +204,12 @@ docker compose exec web flask --app wsgi seed
 ```
 
 访问 `http://localhost:5009`（后端 API）与前端开发地址进行联调。
+
+## 6. 许可证
+
+本项目采用 `UniArchive AI 严格非商业许可证（Strict Non-Commercial License）v1.0`。
+
+- **禁止商用**：任何直接或间接商业用途均不被允许。
+- **允许修改但不得放宽许可范围**：二次修改后再发布时，不得删除非商业限制，也不得改为更宽松（允许商用）的许可证。
+
+完整条款见根目录 [LICENSE](./LICENSE)。
